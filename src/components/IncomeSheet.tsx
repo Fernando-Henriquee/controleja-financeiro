@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { useStore } from "@/lib/store";
-import { expectedMonthlyIncome, fmtBRL } from "@/lib/finance";
+import { businessDaysInMonth, expectedMonthlyIncome, fmtBRL, monthLabel } from "@/lib/finance";
 import { Settings2, X } from "lucide-react";
 
 export function IncomeSheet() {
-  const { income, updateIncome } = useStore();
+  const { income, updateIncome, selectedMonth } = useStore();
   const [open, setOpen] = useState(false);
   const expected = expectedMonthlyIncome(income);
 
@@ -19,7 +19,7 @@ export function IncomeSheet() {
             <Settings2 className="h-4 w-4" />
           </div>
           <div className="text-left">
-            <p className="text-xs uppercase tracking-wider text-muted-foreground">Renda prevista</p>
+            <p className="text-xs uppercase tracking-wider text-muted-foreground">Renda prevista ({monthLabel(selectedMonth)})</p>
             <p className="font-display text-base font-semibold tabular-nums">{fmtBRL(expected)}</p>
           </div>
         </div>
@@ -36,10 +36,24 @@ export function IncomeSheet() {
               </button>
             </div>
             <div className="space-y-3">
-              <Field label="Valor por hora (R$)" value={income.hourly_rate} onChange={(v) => updateIncome({ hourly_rate: v })} />
-              <Field label="Horas por dia" value={income.hours_per_day} onChange={(v) => updateIncome({ hours_per_day: v })} />
-              <Field label="Dias úteis no mês" value={income.working_days} onChange={(v) => updateIncome({ working_days: v })} />
-              <Field label="Ajuste manual (R$)" value={income.manual_adjustment} onChange={(v) => updateIncome({ manual_adjustment: v })} />
+              <div className="grid grid-cols-2 gap-2 rounded-xl bg-surface p-1">
+                <ModeButton active={income.mode === "clt"} onClick={() => updateIncome({ mode: "clt" })}>CLT</ModeButton>
+                <ModeButton active={income.mode === "pj"} onClick={() => updateIncome({ mode: "pj", working_days: businessDaysInMonth() })}>PJ</ModeButton>
+              </div>
+
+              {income.mode === "clt" ? (
+                <Field label="Salário mensal (R$)" value={income.monthly_salary} onChange={(v) => updateIncome({ monthly_salary: v })} />
+              ) : (
+                <>
+                  <Field label="Valor hora (R$)" value={income.hourly_rate} onChange={(v) => updateIncome({ hourly_rate: v })} />
+                  <div className="rounded-xl border border-border bg-background px-3 py-2">
+                    <p className="text-xs text-muted-foreground">Base PJ</p>
+                    <p className="text-sm font-medium">R$ hora x 8h x {income.working_days} dias úteis</p>
+                  </div>
+                </>
+              )}
+
+              <Field label="Extras (PIX e entradas avulsas) (R$)" value={income.extra_income} onChange={(v) => updateIncome({ extra_income: v })} />
             </div>
             <div className="mt-4 rounded-xl bg-surface p-3">
               <p className="text-xs text-muted-foreground">Renda prevista total</p>
@@ -52,14 +66,39 @@ export function IncomeSheet() {
   );
 }
 
+function ModeButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${active ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+    >
+      {children}
+    </button>
+  );
+}
+
 function Field({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
+  const [draft, setDraft] = useState(String(value));
+
+  useEffect(() => {
+    setDraft(String(value));
+  }, [value]);
+
   return (
     <label className="block">
       <span className="text-xs text-muted-foreground">{label}</span>
       <input
         type="number"
-        value={value}
-        onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
+        value={draft}
+        onFocus={() => {
+          if (draft === "0") setDraft("");
+        }}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={() => {
+          const parsed = parseFloat(draft.replace(",", "."));
+          onChange(Number.isFinite(parsed) ? parsed : 0);
+        }}
         className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
       />
     </label>

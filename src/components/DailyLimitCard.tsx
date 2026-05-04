@@ -1,22 +1,27 @@
 import { useStore } from "@/lib/store";
-import { dailyLimit, todaySpent, dailyStatus, fmtBRL, daysRemaining } from "@/lib/finance";
+import { dailyLimit, todaySpent, dailyStatus, fmtBRL, daysRemaining, idealDailyAverage, dailyDeviationFromIdeal, monthKey } from "@/lib/finance";
 import { cn } from "@/lib/utils";
 
 export function DailyLimitCard() {
-  const { income, expenses } = useStore();
+  const { income, expenses, selectedMonth } = useStore();
+  const isCurrentMonth = selectedMonth === monthKey();
   const limit = dailyLimit(income, expenses);
   const spent = todaySpent(expenses);
   const status = dailyStatus(income, expenses);
   const remaining = Math.max(0, limit - spent);
   const pct = limit > 0 ? Math.min(100, (spent / limit) * 100) : 100;
+  const ideal = idealDailyAverage(income);
+  const deviation = dailyDeviationFromIdeal(income, expenses);
+  const direction = deviation > 0 ? "+" : "-";
 
   const grad = status === "safe" ? "bg-gradient-safe" : status === "warn" ? "bg-gradient-warn" : "bg-gradient-danger";
-  const message =
-    status === "danger"
-      ? "Não recomendado gastar mais hoje"
-      : status === "warn"
-      ? "Atenção, você está chegando no limite"
-      : "Você está dentro do limite diário";
+  const message = !isCurrentMonth
+    ? "Visualizacao historica do mes selecionado."
+    : status === "danger"
+    ? "Hoje nao e um bom dia para gastar."
+    : status === "warn"
+    ? pct > 70 ? "Se continuar assim, vai estourar o mes." : "Voce ja usou 40% do limite do dia."
+    : "Voce esta dentro do limite diario.";
 
   return (
     <div className={cn("relative overflow-hidden rounded-2xl p-6 text-white shadow-elegant", grad)}>
@@ -36,6 +41,11 @@ export function DailyLimitCard() {
           <div className="h-full rounded-full bg-white transition-all duration-500" style={{ width: `${pct}%` }} />
         </div>
         <p className="mt-3 text-sm font-medium">{message}</p>
+        <div className="mt-3 rounded-xl bg-white/15 p-3 text-xs text-white">
+          <p>Voce pode gastar ate {fmtBRL(remaining)} hoje</p>
+          <p className="mt-1">Media ideal: {fmtBRL(ideal)}/dia</p>
+          <p className="mt-1">Voce esta {direction}{fmtBRL(Math.abs(deviation))} do ideal</p>
+        </div>
       </div>
     </div>
   );

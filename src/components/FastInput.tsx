@@ -1,31 +1,30 @@
-import { useState, useRef } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useStore } from "@/lib/store";
 import { Mic, Send, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { fmtBRL } from "@/lib/finance";
-
-const SUGGESTIONS = [
-  "30 almoço debito itau",
-  "50 gasolina credito nubank",
-  "15 uber pix picpay",
-  "120 mercado credito itau",
-];
+import { localSuggestionProvider } from "@/lib/suggestions";
 
 export function FastInput() {
-  const { addExpenseFromText } = useStore();
+  const { addExpenseFromText, expenses, accounts, patterns } = useStore();
   const [value, setValue] = useState("");
   const [listening, setListening] = useState(false);
   const recognitionRef = useRef<any>(null);
+  const smartSuggestions = useMemo(
+    () => localSuggestionProvider.suggest(value, expenses, accounts, patterns),
+    [value, expenses, accounts, patterns],
+  );
+  const chips = smartSuggestions.map((s) => s.fillText);
 
   async function submit(text?: string) {
     const t = (text ?? value).trim();
     if (!t) return;
-    const exp = await addExpenseFromText(t);
-    if (!exp) {
-      toast.error("Não consegui entender. Tente: 30 almoço debito");
+    const result = await addExpenseFromText(t);
+    if (!result.expense) {
+      toast.error(result.error ?? "Não consegui entender. Tente: 30 almoço debito");
       return;
     }
-    toast.success(`${fmtBRL(Number(exp.amount))} • ${exp.category} • ${exp.method}`);
+    toast.success(`${fmtBRL(Number(result.expense.amount))} • ${result.expense.category} • ${result.expense.method}`);
     setValue("");
   }
 
@@ -78,17 +77,28 @@ export function FastInput() {
           <Send className="h-4 w-4" />
         </button>
       </form>
-      <div className="no-scrollbar flex gap-2 overflow-x-auto">
-        {SUGGESTIONS.map((s) => (
-          <button
-            key={s}
-            onClick={() => submit(s)}
-            className="shrink-0 rounded-full border border-border bg-surface px-3 py-1 text-xs text-muted-foreground hover:border-primary hover:text-primary transition"
-          >
-            {s}
-          </button>
-        ))}
-      </div>
+      {chips.length ? (
+        <div className="no-scrollbar flex gap-2 overflow-x-auto">
+          {chips.map((s) => (
+            <button
+              key={s}
+              onClick={() => submit(s)}
+              className="shrink-0 rounded-full border border-border bg-surface px-3 py-1 text-xs text-muted-foreground hover:border-primary hover:text-primary transition"
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <p className="px-1 text-[11px] text-muted-foreground">
+          Suas sugestoes aparecem automaticamente conforme seu historico real.
+        </p>
+      )}
+      {smartSuggestions.length ? (
+        <p className="px-1 text-[11px] text-muted-foreground">
+          Sugestoes inteligentes baseadas no seu historico recente.
+        </p>
+      ) : null}
     </div>
   );
 }

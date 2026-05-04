@@ -29,8 +29,40 @@ export type Expense = {
 };
 
 export type Income = {
+  mode: "clt" | "pj";
+  monthly_salary: number;
   hourly_rate: number;
-  hours_per_day: number;
   working_days: number;
-  manual_adjustment: number;
+  extra_income: number;
+};
+
+export type RecurringRule = {
+  id: string;
+  profile_id: string;
+  description: string;
+  amount: number;
+  category: string;
+  method: PaymentMethod;
+  account_id: string;
+  day_of_month: number;
+  applied_months: string[];
+};
+
+export type Reminder = {
+  id: string;
+  profile_id: string;
+  title: string;
+  day_of_month: number;
+  enabled: boolean;
+};
+
+export type ExpensePattern = {
+  id: string;
+  profile_id: string;
+  pattern: string;
+  category: string;
+  method: PaymentMethod;
+  account_id: string;
+  use_count: number;
+  last_used_at: string;
 };

@@ -24,8 +24,8 @@ export default function Profiles() {
   }
 
   return (
-    <main className="min-h-screen bg-gradient-surface px-4 py-12">
-      <div className="mx-auto max-w-md">
+    <main className="min-h-screen bg-gradient-surface px-4 py-10 lg:px-8">
+      <div className="mx-auto max-w-5xl">
         <div className="mb-8 text-center">
           <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Quem está usando?</p>
           <h1 className="mt-1 font-display text-3xl font-bold">Escolha seu perfil</h1>
@@ -35,7 +35,7 @@ export default function Profiles() {
         {loading ? (
           <p className="text-center text-sm text-muted-foreground">Carregando...</p>
         ) : (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
             {profiles.map((p) => (
               <div key={p.id} className="group relative">
                 <button
@@ -79,7 +79,7 @@ export default function Profiles() {
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm" onClick={() => setOpen(false)}>
-          <div className="w-full max-w-md animate-slide-up rounded-t-3xl bg-card p-6 safe-bottom" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full max-w-md animate-slide-up rounded-t-3xl bg-card p-6 safe-bottom lg:rounded-3xl" onClick={(e) => e.stopPropagation()}>
             <h3 className="mb-4 font-display text-lg font-semibold">Novo perfil</h3>
 
             <label className="block">

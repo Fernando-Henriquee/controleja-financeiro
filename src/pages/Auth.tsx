@@ -26,52 +26,61 @@ export default function Auth() {
   }
 
   return (
-    <main className="min-h-screen bg-gradient-surface px-4 py-12">
-      <div className="mx-auto max-w-sm">
-        <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-gradient-primary text-primary-foreground shadow-elegant">
-            <Wallet className="h-6 w-6" />
-          </div>
-          <h1 className="font-display text-3xl font-bold">Copilot Financeiro</h1>
-          <p className="mt-2 text-sm text-muted-foreground">Disciplina automática para seus gastos.</p>
+    <main className="min-h-screen bg-gradient-surface px-4 py-8 lg:px-8 lg:py-12">
+      <div className="mx-auto grid w-full max-w-5xl gap-8 lg:grid-cols-2 lg:items-center">
+        <div className="hidden lg:block">
+          <h1 className="font-display text-4xl font-bold">Copilot Financeiro</h1>
+          <p className="mt-3 max-w-md text-sm text-muted-foreground">
+            Controle comportamental com limite diario dinamico, alertas ativos e previsao para fechar o mes no verde.
+          </p>
         </div>
 
-        <form onSubmit={onSubmit} className="space-y-3 rounded-2xl border border-border bg-card p-5 shadow-card">
-          <h2 className="font-display text-lg font-semibold">
-            {mode === "signin" ? "Entrar" : "Criar conta"}
-          </h2>
+        <div className="mx-auto w-full max-w-sm">
+          <div className="mb-8 text-center lg:text-left">
+            <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-gradient-primary text-primary-foreground shadow-elegant lg:mx-0">
+              <Wallet className="h-6 w-6" />
+            </div>
+            <h1 className="font-display text-3xl font-bold lg:hidden">Copilot Financeiro</h1>
+            <p className="mt-2 text-sm text-muted-foreground">Disciplina automática para seus gastos.</p>
+          </div>
 
-          <label className="block">
-            <span className="text-xs text-muted-foreground">E-mail</span>
-            <input
-              type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
-              className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-primary"
-              autoComplete="email"
-            />
-          </label>
-          <label className="block">
-            <span className="text-xs text-muted-foreground">Senha</span>
-            <input
-              type="password" required value={password} onChange={(e) => setPassword(e.target.value)}
-              className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-primary"
-              autoComplete={mode === "signin" ? "current-password" : "new-password"}
-            />
-          </label>
+          <form onSubmit={onSubmit} className="space-y-3 rounded-2xl border border-border bg-card p-5 shadow-card">
+            <h2 className="font-display text-lg font-semibold">
+              {mode === "signin" ? "Entrar" : "Criar conta"}
+            </h2>
 
-          <button
-            type="submit" disabled={loading}
-            className="w-full rounded-xl bg-gradient-primary py-2.5 text-sm font-semibold text-primary-foreground shadow-elegant hover:opacity-90 active:scale-[0.99] transition disabled:opacity-50"
-          >
-            {loading ? "Aguarde..." : mode === "signin" ? "Entrar" : "Criar conta"}
-          </button>
+            <label className="block">
+              <span className="text-xs text-muted-foreground">E-mail</span>
+              <input
+                type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
+                className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-primary"
+                autoComplete="email"
+              />
+            </label>
+            <label className="block">
+              <span className="text-xs text-muted-foreground">Senha</span>
+              <input
+                type="password" required value={password} onChange={(e) => setPassword(e.target.value)}
+                className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-primary"
+                autoComplete={mode === "signin" ? "current-password" : "new-password"}
+              />
+            </label>
 
-          <button
-            type="button" onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
-            className="w-full text-center text-xs text-muted-foreground hover:text-primary transition"
-          >
-            {mode === "signin" ? "Não tem conta? Criar agora" : "Já tem conta? Entrar"}
-          </button>
-        </form>
+            <button
+              type="submit" disabled={loading}
+              className="w-full rounded-xl bg-gradient-primary py-2.5 text-sm font-semibold text-primary-foreground shadow-elegant hover:opacity-90 active:scale-[0.99] transition disabled:opacity-50"
+            >
+              {loading ? "Aguarde..." : mode === "signin" ? "Entrar" : "Criar conta"}
+            </button>
+
+            <button
+              type="button" onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
+              className="w-full text-center text-xs text-muted-foreground hover:text-primary transition"
+            >
+              {mode === "signin" ? "Não tem conta? Criar agora" : "Já tem conta? Entrar"}
+            </button>
+          </form>
+        </div>
       </div>
     </main>
   );

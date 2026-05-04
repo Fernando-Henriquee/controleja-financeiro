@@ -2,11 +2,13 @@ import { useStore } from "@/lib/store";
 import {
   totalBalance, totalCreditUsed, monthSpent, monthProgress,
   forecastEndOfMonth, expectedMonthlyIncome, fmtBRL,
+  endOfMonthBalanceIfCurrentPace, endOfMonthBalanceIfDisciplined,
+  monthLabel,
 } from "@/lib/finance";
 import { TrendingDown, TrendingUp, Target } from "lucide-react";
 
 export function StatsGrid() {
-  const { accounts, expenses, income } = useStore();
+  const { accounts, expenses, income, selectedMonth } = useStore();
   const balance = totalBalance(accounts);
   const credit = totalCreditUsed(accounts);
   const spent = monthSpent(expenses);
@@ -14,6 +16,8 @@ export function StatsGrid() {
   const forecast = forecastEndOfMonth(expenses);
   const progress = monthProgress(income, expenses) * 100;
   const overForecast = forecast > incomeTotal;
+  const currentPaceBalance = endOfMonthBalanceIfCurrentPace(income, expenses);
+  const disciplinedBalance = endOfMonthBalanceIfDisciplined(income, expenses);
 
   return (
     <div className="space-y-3">
@@ -23,8 +27,9 @@ export function StatsGrid() {
       </div>
       <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
         <div className="flex items-center justify-between">
-          <p className="text-xs uppercase tracking-wider text-muted-foreground">Mês atual</p>
+          <p className="text-xs uppercase tracking-wider text-muted-foreground">Mês de referência</p>
           <span className="text-xs text-muted-foreground tabular-nums">
+            {monthLabel(selectedMonth)} ·{" "}
             {fmtBRL(spent)} / {fmtBRL(incomeTotal)}
           </span>
         </div>
@@ -43,6 +48,20 @@ export function StatsGrid() {
           <span className={`font-semibold tabular-nums ${overForecast ? "text-status-danger" : "text-status-safe"}`}>
             {fmtBRL(forecast)}
           </span>
+        </div>
+        <div className="mt-3 grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
+          <div className="rounded-lg bg-secondary/60 p-2">
+            <p className="text-muted-foreground">Se continuar assim</p>
+            <p className={`font-semibold ${currentPaceBalance < 0 ? "text-status-danger" : "text-status-safe"}`}>
+              termina com {fmtBRL(currentPaceBalance)}
+            </p>
+          </div>
+          <div className="rounded-lg bg-secondary/60 p-2">
+            <p className="text-muted-foreground">Se seguir limite</p>
+            <p className={`font-semibold ${disciplinedBalance < 0 ? "text-status-danger" : "text-status-safe"}`}>
+              sobra {fmtBRL(disciplinedBalance)}
+            </p>
+          </div>
         </div>
       </div>
     </div>

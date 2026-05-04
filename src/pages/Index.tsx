@@ -7,9 +7,15 @@ import { StatsGrid } from "@/components/StatsGrid";
 import { AccountsList } from "@/components/AccountsList";
 import { RecentExpenses } from "@/components/RecentExpenses";
 import { IncomeSheet } from "@/components/IncomeSheet";
+import { BankInvoices } from "@/components/BankInvoices";
+import { BehaviorAlerts } from "@/components/BehaviorAlerts";
+import { AutomationPanel } from "@/components/AutomationPanel";
+import { ReminderWatcher } from "@/components/ReminderWatcher";
+import { MonthSelector } from "@/components/MonthSelector";
 import Profiles from "./Profiles";
 import { ChevronDown, LogOut } from "lucide-react";
 import { useState } from "react";
+import { Link } from "react-router-dom";
 
 const Index = () => {
   const { session, loading: authLoading, signOut } = useAuth();
@@ -24,7 +30,8 @@ const Index = () => {
 
   return (
     <main className="min-h-screen bg-gradient-surface pb-12">
-      <div className="mx-auto max-w-md space-y-5 px-4 pt-6 safe-top">
+      <ReminderWatcher />
+      <div className="mx-auto max-w-6xl space-y-5 px-4 pt-6 safe-top lg:px-6">
         <header className="flex items-center justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Copilot</p>
@@ -42,11 +49,13 @@ const Index = () => {
               <ChevronDown className="h-3 w-3 text-muted-foreground" />
             </button>
             {menuOpen && (
-              <div className="absolute right-0 top-full mt-2 w-56 overflow-hidden rounded-2xl border border-border bg-card shadow-elegant z-20">
-                {profiles.map(p => (
-                  <button key={p.id}
+              <div className="absolute right-0 top-full z-20 mt-2 w-56 overflow-hidden rounded-2xl border border-border bg-card shadow-elegant">
+                {profiles.map((p) => (
+                  <button
+                    key={p.id}
                     onClick={() => { setActiveProfile(p); setMenuOpen(false); }}
-                    className={`flex w-full items-center gap-2 px-3 py-2 text-left text-xs hover:bg-secondary ${p.id === activeProfile.id ? "bg-primary/5" : ""}`}>
+                    className={`flex w-full items-center gap-2 px-3 py-2 text-left text-xs hover:bg-secondary ${p.id === activeProfile.id ? "bg-primary/5" : ""}`}
+                  >
                     <span className="grid h-7 w-7 place-items-center rounded-lg text-sm" style={{ background: p.color }}>{p.emoji}</span>
                     <span className="font-medium">{p.name}</span>
                   </button>
@@ -67,22 +76,39 @@ const Index = () => {
             )}
           </div>
         </header>
+        <MonthSelector />
 
-        <DailyLimitCard />
-        <FastInput />
-        <StatsGrid />
+        <div className="grid gap-4 lg:grid-cols-12">
+          <div className="space-y-5 lg:col-span-7">
+            <DailyLimitCard />
+            <BehaviorAlerts />
+            <FastInput />
+            <Section title="Últimos gastos">
+              <RecentExpenses />
+            </Section>
+          </div>
 
-        <Section title="Contas">
-          <AccountsList />
-        </Section>
-
-        <Section title="Renda">
-          <IncomeSheet />
-        </Section>
-
-        <Section title="Últimos gastos">
-          <RecentExpenses />
-        </Section>
+          <div className="space-y-5 lg:col-span-5">
+            <StatsGrid />
+            <Section title="Faturas por banco">
+              <div className="mb-2 flex justify-end">
+                <Link to="/cards" className="rounded-lg border border-border bg-card px-2 py-1 text-[11px] text-primary hover:border-primary/50">
+                  Gerenciar cartoes
+                </Link>
+              </div>
+              <BankInvoices />
+            </Section>
+            <Section title="Contas">
+              <AccountsList />
+            </Section>
+            <Section title="Renda">
+              <IncomeSheet />
+            </Section>
+            <Section title="Automacoes">
+              <AutomationPanel />
+            </Section>
+          </div>
+        </div>
       </div>
     </main>
   );
