@@ -14,13 +14,172 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      accounts: {
+        Row: {
+          balance: number
+          color: string
+          created_at: string
+          credit_limit: number | null
+          credit_used: number
+          id: string
+          name: string
+          position: number
+          profile_id: string
+        }
+        Insert: {
+          balance?: number
+          color?: string
+          created_at?: string
+          credit_limit?: number | null
+          credit_used?: number
+          id?: string
+          name: string
+          position?: number
+          profile_id: string
+        }
+        Update: {
+          balance?: number
+          color?: string
+          created_at?: string
+          credit_limit?: number | null
+          credit_used?: number
+          id?: string
+          name?: string
+          position?: number
+          profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "accounts_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      expenses: {
+        Row: {
+          account_id: string
+          amount: number
+          category: string
+          created_at: string
+          description: string
+          id: string
+          method: string
+          occurred_at: string
+          profile_id: string
+          raw: string | null
+        }
+        Insert: {
+          account_id: string
+          amount: number
+          category?: string
+          created_at?: string
+          description: string
+          id?: string
+          method: string
+          occurred_at?: string
+          profile_id: string
+          raw?: string | null
+        }
+        Update: {
+          account_id?: string
+          amount?: number
+          category?: string
+          created_at?: string
+          description?: string
+          id?: string
+          method?: string
+          occurred_at?: string
+          profile_id?: string
+          raw?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expenses_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      income_settings: {
+        Row: {
+          hourly_rate: number
+          hours_per_day: number
+          manual_adjustment: number
+          profile_id: string
+          updated_at: string
+          working_days: number
+        }
+        Insert: {
+          hourly_rate?: number
+          hours_per_day?: number
+          manual_adjustment?: number
+          profile_id: string
+          updated_at?: string
+          working_days?: number
+        }
+        Update: {
+          hourly_rate?: number
+          hours_per_day?: number
+          manual_adjustment?: number
+          profile_id?: string
+          updated_at?: string
+          working_days?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "income_settings_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          color: string
+          created_at: string
+          emoji: string
+          id: string
+          name: string
+          user_id: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          emoji?: string
+          id?: string
+          name: string
+          user_id: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          emoji?: string
+          id?: string
+          name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      is_profile_owner: { Args: { _profile_id: string }; Returns: boolean }
     }
     Enums: {
       [_ in never]: never
