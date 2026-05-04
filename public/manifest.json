@@ -1,0 +1,12 @@
+{
+  "name": "Copilot Financeiro",
+  "short_name": "Copilot",
+  "description": "Seu copiloto financeiro pessoal",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fafbfc",
+  "theme_color": "#3b82f6",
+  "icons": [
+    { "src": "/favicon.ico", "sizes": "64x64", "type": "image/x-icon" }
+  ]
+}
