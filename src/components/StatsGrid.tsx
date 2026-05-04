@@ -1,24 +1,19 @@
 import { useStore } from "@/lib/store";
 import {
-  totalBalance,
-  totalCreditUsed,
-  monthSpent,
-  monthProgress,
-  forecastEndOfMonth,
-  expectedMonthlyIncome,
-  fmtBRL,
+  totalBalance, totalCreditUsed, monthSpent, monthProgress,
+  forecastEndOfMonth, expectedMonthlyIncome, fmtBRL,
 } from "@/lib/finance";
 import { TrendingDown, TrendingUp, Target } from "lucide-react";
 
 export function StatsGrid() {
-  const { state } = useStore();
-  const balance = totalBalance(state);
-  const credit = totalCreditUsed(state);
-  const spent = monthSpent(state);
-  const income = expectedMonthlyIncome(state);
-  const forecast = forecastEndOfMonth(state);
-  const progress = monthProgress(state) * 100;
-  const overForecast = forecast > income;
+  const { accounts, expenses, income } = useStore();
+  const balance = totalBalance(accounts);
+  const credit = totalCreditUsed(accounts);
+  const spent = monthSpent(expenses);
+  const incomeTotal = expectedMonthlyIncome(income);
+  const forecast = forecastEndOfMonth(expenses);
+  const progress = monthProgress(income, expenses) * 100;
+  const overForecast = forecast > incomeTotal;
 
   return (
     <div className="space-y-3">
@@ -30,7 +25,7 @@ export function StatsGrid() {
         <div className="flex items-center justify-between">
           <p className="text-xs uppercase tracking-wider text-muted-foreground">Mês atual</p>
           <span className="text-xs text-muted-foreground tabular-nums">
-            {fmtBRL(spent)} / {fmtBRL(income)}
+            {fmtBRL(spent)} / {fmtBRL(incomeTotal)}
           </span>
         </div>
         <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-secondary">
@@ -38,8 +33,7 @@ export function StatsGrid() {
             className="h-full rounded-full transition-all"
             style={{
               width: `${Math.min(100, progress)}%`,
-              background:
-                progress > 100 ? "hsl(var(--status-danger))" : progress > 75 ? "hsl(var(--status-warn))" : "hsl(var(--status-safe))",
+              background: progress > 100 ? "hsl(var(--status-danger))" : progress > 75 ? "hsl(var(--status-warn))" : "hsl(var(--status-safe))",
             }}
           />
         </div>
