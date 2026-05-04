@@ -1,12 +1,20 @@
 export type PaymentMethod = "credit" | "debit" | "pix" | "cash";
 
+export type Profile = {
+  id: string;
+  name: string;
+  emoji: string;
+  color: string;
+};
+
 export type Account = {
   id: string;
   name: string;
   color: string;
-  balance: number; // debit balance
-  creditLimit?: number;
-  creditUsed?: number;
+  balance: number;
+  credit_limit: number | null;
+  credit_used: number;
+  position: number;
 };
 
 export type Expense = {
@@ -15,21 +23,14 @@ export type Expense = {
   description: string;
   category: string;
   method: PaymentMethod;
-  accountId: string;
-  date: string; // ISO
-  raw?: string;
+  account_id: string;
+  occurred_at: string;
+  raw?: string | null;
 };
 
 export type Income = {
-  hourlyRate: number;
-  hoursPerDay: number;
-  workingDays: number; // per month
-  manualAdjustment?: number; // R$ added/removed
-};
-
-export type AppState = {
-  accounts: Account[];
-  expenses: Expense[];
-  income: Income;
-  monthStart: string; // ISO date
+  hourly_rate: number;
+  hours_per_day: number;
+  working_days: number;
+  manual_adjustment: number;
 };

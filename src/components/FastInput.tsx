@@ -17,15 +17,15 @@ export function FastInput() {
   const [listening, setListening] = useState(false);
   const recognitionRef = useRef<any>(null);
 
-  function submit(text?: string) {
+  async function submit(text?: string) {
     const t = (text ?? value).trim();
     if (!t) return;
-    const exp = addExpenseFromText(t);
+    const exp = await addExpenseFromText(t);
     if (!exp) {
       toast.error("Não consegui entender. Tente: 30 almoço debito");
       return;
     }
-    toast.success(`${fmtBRL(exp.amount)} • ${exp.category} • ${exp.method}`);
+    toast.success(`${fmtBRL(Number(exp.amount))} • ${exp.category} • ${exp.method}`);
     setValue("");
   }
 

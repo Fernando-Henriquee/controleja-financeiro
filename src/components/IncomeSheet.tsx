@@ -4,10 +4,9 @@ import { expectedMonthlyIncome, fmtBRL } from "@/lib/finance";
 import { Settings2, X } from "lucide-react";
 
 export function IncomeSheet() {
-  const { state, updateIncome } = useStore();
+  const { income, updateIncome } = useStore();
   const [open, setOpen] = useState(false);
-  const i = state.income;
-  const expected = expectedMonthlyIncome(state);
+  const expected = expectedMonthlyIncome(income);
 
   return (
     <>
@@ -29,10 +28,7 @@ export function IncomeSheet() {
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm" onClick={() => setOpen(false)}>
-          <div
-            className="w-full max-w-md animate-slide-up rounded-t-3xl bg-card p-6 safe-bottom"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className="w-full max-w-md animate-slide-up rounded-t-3xl bg-card p-6 safe-bottom" onClick={(e) => e.stopPropagation()}>
             <div className="mb-4 flex items-center justify-between">
               <h3 className="font-display text-lg font-semibold">Renda variável</h3>
               <button onClick={() => setOpen(false)} className="grid h-8 w-8 place-items-center rounded-lg hover:bg-secondary">
@@ -40,10 +36,10 @@ export function IncomeSheet() {
               </button>
             </div>
             <div className="space-y-3">
-              <Field label="Valor por hora (R$)" value={i.hourlyRate} onChange={(v) => updateIncome({ hourlyRate: v })} />
-              <Field label="Horas por dia" value={i.hoursPerDay} onChange={(v) => updateIncome({ hoursPerDay: v })} />
-              <Field label="Dias úteis no mês" value={i.workingDays} onChange={(v) => updateIncome({ workingDays: v })} />
-              <Field label="Ajuste manual (R$)" value={i.manualAdjustment ?? 0} onChange={(v) => updateIncome({ manualAdjustment: v })} />
+              <Field label="Valor por hora (R$)" value={income.hourly_rate} onChange={(v) => updateIncome({ hourly_rate: v })} />
+              <Field label="Horas por dia" value={income.hours_per_day} onChange={(v) => updateIncome({ hours_per_day: v })} />
+              <Field label="Dias úteis no mês" value={income.working_days} onChange={(v) => updateIncome({ working_days: v })} />
+              <Field label="Ajuste manual (R$)" value={income.manual_adjustment} onChange={(v) => updateIncome({ manual_adjustment: v })} />
             </div>
             <div className="mt-4 rounded-xl bg-surface p-3">
               <p className="text-xs text-muted-foreground">Renda prevista total</p>

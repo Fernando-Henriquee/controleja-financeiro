@@ -3,10 +3,10 @@ import { dailyLimit, todaySpent, dailyStatus, fmtBRL, daysRemaining } from "@/li
 import { cn } from "@/lib/utils";
 
 export function DailyLimitCard() {
-  const { state } = useStore();
-  const limit = dailyLimit(state);
-  const spent = todaySpent(state);
-  const status = dailyStatus(state);
+  const { income, expenses } = useStore();
+  const limit = dailyLimit(income, expenses);
+  const spent = todaySpent(expenses);
+  const status = dailyStatus(income, expenses);
   const remaining = Math.max(0, limit - spent);
   const pct = limit > 0 ? Math.min(100, (spent / limit) * 100) : 100;
 
@@ -25,7 +25,7 @@ export function DailyLimitCard() {
         <div className="flex items-center justify-between">
           <p className="text-xs font-medium uppercase tracking-wider text-white/80">Limite de hoje</p>
           <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-semibold">
-            {daysRemaining(state)} dias restantes
+            {daysRemaining()} dias restantes
           </span>
         </div>
         <p className="mt-2 font-display text-4xl font-bold">{fmtBRL(remaining)}</p>
@@ -33,10 +33,7 @@ export function DailyLimitCard() {
           de {fmtBRL(limit)} • gasto hoje {fmtBRL(spent)}
         </p>
         <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-white/20">
-          <div
-            className="h-full rounded-full bg-white transition-all duration-500"
-            style={{ width: `${pct}%` }}
-          />
+          <div className="h-full rounded-full bg-white transition-all duration-500" style={{ width: `${pct}%` }} />
         </div>
         <p className="mt-3 text-sm font-medium">{message}</p>
       </div>

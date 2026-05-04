@@ -3,11 +3,11 @@ import { fmtBRL } from "@/lib/finance";
 import { CreditCard, Wallet } from "lucide-react";
 
 export function AccountsList() {
-  const { state } = useStore();
+  const { accounts } = useStore();
   return (
     <div className="space-y-2">
-      {state.accounts.map((a) => {
-        const usedPct = a.creditLimit ? Math.min(100, ((a.creditUsed ?? 0) / a.creditLimit) * 100) : 0;
+      {accounts.map((a) => {
+        const usedPct = a.credit_limit ? Math.min(100, (Number(a.credit_used) / Number(a.credit_limit)) * 100) : 0;
         return (
           <div key={a.id} className="rounded-2xl border border-border bg-card p-4 shadow-sm">
             <div className="flex items-center justify-between">
@@ -20,16 +20,16 @@ export function AccountsList() {
                   <p className="text-xs text-muted-foreground">Saldo</p>
                 </div>
               </div>
-              <p className="font-display text-base font-semibold tabular-nums">{fmtBRL(a.balance)}</p>
+              <p className="font-display text-base font-semibold tabular-nums">{fmtBRL(Number(a.balance))}</p>
             </div>
-            {a.creditLimit ? (
+            {a.credit_limit ? (
               <div className="mt-3 border-t border-border pt-3">
                 <div className="flex items-center justify-between text-xs">
                   <span className="flex items-center gap-1.5 text-muted-foreground">
                     <CreditCard className="h-3.5 w-3.5" /> Fatura aberta
                   </span>
                   <span className="tabular-nums">
-                    {fmtBRL(a.creditUsed ?? 0)} <span className="text-muted-foreground">/ {fmtBRL(a.creditLimit)}</span>
+                    {fmtBRL(Number(a.credit_used))} <span className="text-muted-foreground">/ {fmtBRL(Number(a.credit_limit))}</span>
                   </span>
                 </div>
                 <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-secondary">
