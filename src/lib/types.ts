@@ -61,6 +61,8 @@ export type RecurringRule = {
   account_id: string;
   day_of_month: number;
   applied_months: string[];
+  paid_months: string[];
+  auto_apply: boolean;
 };
 
 export type Reminder = {
