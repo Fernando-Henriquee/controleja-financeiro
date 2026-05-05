@@ -121,18 +121,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setIncome({
         mode: (ir.data.mode as "clt" | "pj") ?? "pj",
         monthly_salary: Number(ir.data.monthly_salary ?? 0),
-        hourly_rate: Number(ir.data.hourly_rate),
-        working_days: Number(ir.data.working_days ?? businessDaysInMonth()),
+        hourly_rate: Number(ir.data.hourly_rate ?? 0),
+        working_days: Number(ir.data.working_days ?? 0),
         extra_income: Number(ir.data.extra_income ?? 0),
       });
     } else if (i.data) {
       setIncome({
         mode: (i.data.mode as "clt" | "pj") ?? "pj",
         monthly_salary: Number(i.data.monthly_salary ?? 0),
-        hourly_rate: Number(i.data.hourly_rate),
-        working_days: Number(i.data.working_days ?? businessDaysInMonth()),
+        hourly_rate: Number(i.data.hourly_rate ?? 0),
+        working_days: Number(i.data.working_days ?? 0),
         extra_income: Number(i.data.extra_income ?? 0),
       });
+    } else {
+      setIncome(DEFAULT_INCOME);
     }
   }, [activeProfile, selectedMonth]);
 
