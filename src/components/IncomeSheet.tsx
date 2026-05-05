@@ -38,7 +38,7 @@ export function IncomeSheet() {
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-2 rounded-xl bg-surface p-1">
                 <ModeButton active={income.mode === "clt"} onClick={() => updateIncome({ mode: "clt" })}>CLT</ModeButton>
-                <ModeButton active={income.mode === "pj"} onClick={() => updateIncome({ mode: "pj", working_days: businessDaysInMonth() })}>PJ</ModeButton>
+                <ModeButton active={income.mode === "pj"} onClick={() => updateIncome({ mode: "pj" })}>PJ</ModeButton>
               </div>
 
               {income.mode === "clt" ? (
@@ -46,9 +46,10 @@ export function IncomeSheet() {
               ) : (
                 <>
                   <Field label="Valor hora (R$)" value={income.hourly_rate} onChange={(v) => updateIncome({ hourly_rate: v })} />
+                  <Field label="Dias trabalhados no mês" value={income.working_days} onChange={(v) => updateIncome({ working_days: v })} />
                   <div className="rounded-xl border border-border bg-background px-3 py-2">
-                    <p className="text-xs text-muted-foreground">Base PJ</p>
-                    <p className="text-sm font-medium">R$ hora x 8h x {income.working_days} dias úteis</p>
+                    <p className="text-xs text-muted-foreground">Cálculo PJ</p>
+                    <p className="text-sm font-medium">R$ {income.hourly_rate} × 8h × {income.working_days} dias = {fmtBRL(income.hourly_rate * 8 * income.working_days)}</p>
                   </div>
                 </>
               )}
