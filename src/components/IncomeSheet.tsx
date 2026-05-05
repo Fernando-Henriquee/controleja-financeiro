@@ -1,12 +1,14 @@
 import { ReactNode, useEffect, useState } from "react";
 import { useStore } from "@/lib/store";
-import { businessDaysInMonth, expectedMonthlyIncome, fmtBRL, monthLabel } from "@/lib/finance";
+import { businessDaysInMonthKey, expectedMonthlyIncome, fmtBRL, monthLabel } from "@/lib/finance";
 import { Settings2, X } from "lucide-react";
 
 export function IncomeSheet() {
   const { income, updateIncome, selectedMonth } = useStore();
   const [open, setOpen] = useState(false);
-  const expected = expectedMonthlyIncome(income);
+  const autoDays = businessDaysInMonthKey(selectedMonth);
+  const effectiveIncome = income.mode === "pj" ? { ...income, working_days: autoDays } : income;
+  const expected = expectedMonthlyIncome(effectiveIncome);
 
   return (
     <>
@@ -46,10 +48,12 @@ export function IncomeSheet() {
               ) : (
                 <>
                   <Field label="Valor hora (R$)" value={income.hourly_rate} onChange={(v) => updateIncome({ hourly_rate: v })} />
-                  <Field label="Dias trabalhados no mês" value={income.working_days} onChange={(v) => updateIncome({ working_days: v })} />
                   <div className="rounded-xl border border-border bg-background px-3 py-2">
-                    <p className="text-xs text-muted-foreground">Cálculo PJ</p>
-                    <p className="text-sm font-medium">R$ {income.hourly_rate} × 8h × {income.working_days} dias = {fmtBRL(income.hourly_rate * 8 * income.working_days)}</p>
+                    <p className="text-xs text-muted-foreground">Cálculo PJ ({monthLabel(selectedMonth)})</p>
+                    <p className="text-sm font-medium">
+                      R$ {income.hourly_rate} × 8h × <strong>{autoDays}</strong> dias úteis = {fmtBRL(income.hourly_rate * 8 * autoDays)}
+                    </p>
+                    <p className="mt-1 text-[11px] text-muted-foreground">Dias úteis calculados automaticamente para o mês de referência.</p>
                   </div>
                 </>
               )}

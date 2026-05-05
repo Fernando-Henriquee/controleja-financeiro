@@ -98,6 +98,11 @@ export function businessDaysInMonth(baseDate = new Date()): number {
   }
   return total;
 }
+
+export function businessDaysInMonthKey(key: string): number {
+  const [y, m] = key.split("-").map(Number);
+  return businessDaysInMonth(new Date(y, m - 1, 1));
+}
 export function totalBalance(accounts: Account[]): number {
   return accounts.reduce((a, x) => a + Number(x.balance), 0);
 }

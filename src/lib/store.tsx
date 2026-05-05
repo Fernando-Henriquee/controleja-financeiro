@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Account, AccountKind, Expense, ExpensePattern, Income, Loan, PaymentMethod, Profile, RecurringRule, Reminder } from "./types";
-import { businessDaysInMonth, monthDateRange, monthKey, parseExpenseWithHistory } from "./finance";
+import { businessDaysInMonth, businessDaysInMonthKey, monthDateRange, monthKey, parseExpenseWithHistory } from "./finance";
 import { useAuth } from "./auth";
 
 const ACTIVE_KEY = "copilot.activeProfileId";
@@ -402,17 +402,23 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setLoans((prev) => prev.filter((l) => l.id !== id));
   }, []);
 
+  const effectiveIncome = useMemo<Income>(() => (
+    income.mode === "pj"
+      ? { ...income, working_days: businessDaysInMonthKey(selectedMonth) }
+      : income
+  ), [income, selectedMonth]);
+
   const value = useMemo<Ctx>(() => ({
     loading, profiles, activeProfile, selectedMonth, setActiveProfile, setSelectedMonth,
     createProfile, deleteProfile,
-    accounts, expenses, income, recurringRules, reminders, patterns, loans,
+    accounts, expenses, income: effectiveIncome, recurringRules, reminders, patterns, loans,
     addExpenseFromText, addExpenseManual, removeExpense,
     updateAccountCreditLimit, updateAccountCreditUsed, addCreditAccount, addDebitAccount, removeAccount,
     updateIncome,
     addRecurringRule, removeRecurringRule, addReminder, removeReminder,
     addLoan, updateLoan, removeLoan,
     refresh,
-  }), [loading, profiles, activeProfile, selectedMonth, setActiveProfile, createProfile, deleteProfile, accounts, expenses, income, recurringRules, reminders, patterns, loans, addExpenseFromText, addExpenseManual, removeExpense, updateAccountCreditLimit, updateAccountCreditUsed, addCreditAccount, addDebitAccount, removeAccount, updateIncome, addRecurringRule, removeRecurringRule, addReminder, removeReminder, addLoan, updateLoan, removeLoan, refresh]);
+  }), [loading, profiles, activeProfile, selectedMonth, setActiveProfile, createProfile, deleteProfile, accounts, expenses, effectiveIncome, recurringRules, reminders, patterns, loans, addExpenseFromText, addExpenseManual, removeExpense, updateAccountCreditLimit, updateAccountCreditUsed, addCreditAccount, addDebitAccount, removeAccount, updateIncome, addRecurringRule, removeRecurringRule, addReminder, removeReminder, addLoan, updateLoan, removeLoan, refresh]);
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }
