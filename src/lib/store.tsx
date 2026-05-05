@@ -402,17 +402,23 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setLoans((prev) => prev.filter((l) => l.id !== id));
   }, []);
 
+  const effectiveIncome = useMemo<Income>(() => (
+    income.mode === "pj"
+      ? { ...income, working_days: businessDaysInMonthKey(selectedMonth) }
+      : income
+  ), [income, selectedMonth]);
+
   const value = useMemo<Ctx>(() => ({
     loading, profiles, activeProfile, selectedMonth, setActiveProfile, setSelectedMonth,
     createProfile, deleteProfile,
-    accounts, expenses, income, recurringRules, reminders, patterns, loans,
+    accounts, expenses, income: effectiveIncome, recurringRules, reminders, patterns, loans,
     addExpenseFromText, addExpenseManual, removeExpense,
     updateAccountCreditLimit, updateAccountCreditUsed, addCreditAccount, addDebitAccount, removeAccount,
     updateIncome,
     addRecurringRule, removeRecurringRule, addReminder, removeReminder,
     addLoan, updateLoan, removeLoan,
     refresh,
-  }), [loading, profiles, activeProfile, selectedMonth, setActiveProfile, createProfile, deleteProfile, accounts, expenses, income, recurringRules, reminders, patterns, loans, addExpenseFromText, addExpenseManual, removeExpense, updateAccountCreditLimit, updateAccountCreditUsed, addCreditAccount, addDebitAccount, removeAccount, updateIncome, addRecurringRule, removeRecurringRule, addReminder, removeReminder, addLoan, updateLoan, removeLoan, refresh]);
+  }), [loading, profiles, activeProfile, selectedMonth, setActiveProfile, createProfile, deleteProfile, accounts, expenses, effectiveIncome, recurringRules, reminders, patterns, loans, addExpenseFromText, addExpenseManual, removeExpense, updateAccountCreditLimit, updateAccountCreditUsed, addCreditAccount, addDebitAccount, removeAccount, updateIncome, addRecurringRule, removeRecurringRule, addReminder, removeReminder, addLoan, updateLoan, removeLoan, refresh]);
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }
