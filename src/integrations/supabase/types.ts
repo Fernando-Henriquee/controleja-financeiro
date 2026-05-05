@@ -58,6 +58,57 @@ export type Database = {
           },
         ]
       }
+      expense_patterns: {
+        Row: {
+          account_id: string
+          category: string
+          created_at: string
+          id: string
+          last_used_at: string
+          method: string
+          pattern: string
+          profile_id: string
+          use_count: number
+        }
+        Insert: {
+          account_id: string
+          category?: string
+          created_at?: string
+          id?: string
+          last_used_at?: string
+          method: string
+          pattern: string
+          profile_id: string
+          use_count?: number
+        }
+        Update: {
+          account_id?: string
+          category?: string
+          created_at?: string
+          id?: string
+          last_used_at?: string
+          method?: string
+          pattern?: string
+          profile_id?: string
+          use_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expense_patterns_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expense_patterns_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       expenses: {
         Row: {
           account_id: string
@@ -112,47 +163,6 @@ export type Database = {
           },
         ]
       }
-      income_settings: {
-        Row: {
-          extra_income: number
-          hourly_rate: number
-          manual_adjustment: number
-          mode: string
-          monthly_salary: number
-          profile_id: string
-          updated_at: string
-          working_days: number
-        }
-        Insert: {
-          extra_income?: number
-          hourly_rate?: number
-          manual_adjustment?: number
-          mode?: string
-          monthly_salary?: number
-          profile_id: string
-          updated_at?: string
-          working_days?: number
-        }
-        Update: {
-          extra_income?: number
-          hourly_rate?: number
-          manual_adjustment?: number
-          mode?: string
-          monthly_salary?: number
-          profile_id?: string
-          updated_at?: string
-          working_days?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "income_settings_profile_id_fkey"
-            columns: ["profile_id"]
-            isOneToOne: true
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       income_records: {
         Row: {
           created_at: string
@@ -200,91 +210,76 @@ export type Database = {
           },
         ]
       }
-      expense_patterns: {
+      income_settings: {
         Row: {
-          account_id: string
-          category: string
-          created_at: string
-          id: string
-          last_used_at: string
-          method: string
-          pattern: string
+          extra_income: number
+          hourly_rate: number
+          hours_per_day: number
+          manual_adjustment: number
+          mode: string
+          monthly_salary: number
           profile_id: string
-          use_count: number
+          updated_at: string
+          working_days: number
         }
         Insert: {
-          account_id: string
-          category?: string
-          created_at?: string
-          id?: string
-          last_used_at?: string
-          method: string
-          pattern: string
+          extra_income?: number
+          hourly_rate?: number
+          hours_per_day?: number
+          manual_adjustment?: number
+          mode?: string
+          monthly_salary?: number
           profile_id: string
-          use_count?: number
+          updated_at?: string
+          working_days?: number
         }
         Update: {
-          account_id?: string
-          category?: string
-          created_at?: string
-          id?: string
-          last_used_at?: string
-          method?: string
-          pattern?: string
+          extra_income?: number
+          hourly_rate?: number
+          hours_per_day?: number
+          manual_adjustment?: number
+          mode?: string
+          monthly_salary?: number
           profile_id?: string
-          use_count?: number
+          updated_at?: string
+          working_days?: number
         }
         Relationships: [
           {
-            foreignKeyName: "expense_patterns_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "accounts"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "expense_patterns_profile_id_fkey"
+            foreignKeyName: "income_settings_profile_id_fkey"
             columns: ["profile_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
       }
-      reminders: {
+      profiles: {
         Row: {
+          color: string
           created_at: string
-          day_of_month: number
-          enabled: boolean
+          emoji: string
           id: string
-          profile_id: string
-          title: string
+          name: string
+          user_id: string
         }
         Insert: {
+          color?: string
           created_at?: string
-          day_of_month: number
-          enabled?: boolean
+          emoji?: string
           id?: string
-          profile_id: string
-          title: string
+          name: string
+          user_id: string
         }
         Update: {
+          color?: string
           created_at?: string
-          day_of_month?: number
-          enabled?: boolean
+          emoji?: string
           id?: string
-          profile_id?: string
-          title?: string
+          name?: string
+          user_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "reminders_profile_id_fkey"
-            columns: ["profile_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       recurring_rules: {
         Row: {
@@ -340,32 +335,40 @@ export type Database = {
           },
         ]
       }
-      profiles: {
+      reminders: {
         Row: {
-          color: string
           created_at: string
-          emoji: string
+          day_of_month: number
+          enabled: boolean
           id: string
-          name: string
-          user_id: string
+          profile_id: string
+          title: string
         }
         Insert: {
-          color?: string
           created_at?: string
-          emoji?: string
+          day_of_month: number
+          enabled?: boolean
           id?: string
-          name: string
-          user_id: string
+          profile_id: string
+          title: string
         }
         Update: {
-          color?: string
           created_at?: string
-          emoji?: string
+          day_of_month?: number
+          enabled?: boolean
           id?: string
-          name?: string
-          user_id?: string
+          profile_id?: string
+          title?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "reminders_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
