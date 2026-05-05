@@ -382,14 +382,36 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setReminders((prev) => prev.filter((r) => r.id !== id));
   }, []);
 
+  const addLoan = useCallback(async (loan: Omit<Loan, "id" | "profile_id">) => {
+    if (!activeProfile) return;
+    const { data } = await supabase.from("loans").insert({
+      profile_id: activeProfile.id,
+      ...loan,
+    }).select().single();
+    if (data) setLoans((prev) => [data as Loan, ...prev]);
+  }, [activeProfile]);
+
+  const updateLoan = useCallback(async (id: string, patch: Partial<Omit<Loan, "id" | "profile_id">>) => {
+    const { data } = await supabase.from("loans").update(patch).eq("id", id).select().single();
+    if (data) setLoans((prev) => prev.map((l) => l.id === id ? (data as Loan) : l));
+  }, []);
+
+  const removeLoan = useCallback(async (id: string) => {
+    await supabase.from("loans").delete().eq("id", id);
+    setLoans((prev) => prev.filter((l) => l.id !== id));
+  }, []);
+
   const value = useMemo<Ctx>(() => ({
     loading, profiles, activeProfile, selectedMonth, setActiveProfile, setSelectedMonth,
     createProfile, deleteProfile,
-    accounts, expenses, income, recurringRules, reminders, patterns,
-    addExpenseFromText, removeExpense, updateAccountCreditLimit, updateAccountCreditUsed, addCreditAccount, updateIncome,
+    accounts, expenses, income, recurringRules, reminders, patterns, loans,
+    addExpenseFromText, addExpenseManual, removeExpense,
+    updateAccountCreditLimit, updateAccountCreditUsed, addCreditAccount, addDebitAccount, removeAccount,
+    updateIncome,
     addRecurringRule, removeRecurringRule, addReminder, removeReminder,
+    addLoan, updateLoan, removeLoan,
     refresh,
-  }), [loading, profiles, activeProfile, selectedMonth, setActiveProfile, createProfile, deleteProfile, accounts, expenses, income, recurringRules, reminders, patterns, addExpenseFromText, removeExpense, updateAccountCreditLimit, updateAccountCreditUsed, addCreditAccount, updateIncome, addRecurringRule, removeRecurringRule, addReminder, removeReminder, refresh]);
+  }), [loading, profiles, activeProfile, selectedMonth, setActiveProfile, createProfile, deleteProfile, accounts, expenses, income, recurringRules, reminders, patterns, loans, addExpenseFromText, addExpenseManual, removeExpense, updateAccountCreditLimit, updateAccountCreditUsed, addCreditAccount, addDebitAccount, removeAccount, updateIncome, addRecurringRule, removeRecurringRule, addReminder, removeReminder, addLoan, updateLoan, removeLoan, refresh]);
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }
