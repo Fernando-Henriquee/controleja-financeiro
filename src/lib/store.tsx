@@ -375,11 +375,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setRecurringRules((prev) => prev.filter((r) => r.id !== id));
   }, []);
 
-  const markRecurringPaid = useCallback(async (ruleId: string, mKey: string) => {
+  const markRecurringPaid = useCallback(async (ruleId: string, mKey: string, overrides?: { account_id?: string; method?: PaymentMethod }) => {
     if (!activeProfile) return;
     const rule = recurringRules.find((r) => r.id === ruleId);
     if (!rule) return;
     if (rule.paid_months.includes(mKey)) return;
+
+    const payAccountId = overrides?.account_id ?? rule.account_id;
+    const payMethod: PaymentMethod = overrides?.method ?? rule.method;
 
     // Create the expense, dated within the target month at the rule's payment day
     const [yy, mm] = mKey.split("-").map(Number);
@@ -389,19 +392,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
     const { data } = await supabase.from("expenses").insert({
       profile_id: activeProfile.id,
-      account_id: rule.account_id,
+      account_id: payAccountId,
       amount: rule.amount,
       description: `[Recorrente] ${rule.description}`,
       category: rule.category,
-      method: rule.method,
+      method: payMethod,
       raw: `recorrente:${rule.id}:${mKey}`,
       occurred_at: occurredAt,
     }).select().single();
     if (!data) return;
 
-    const acc = accounts.find((a) => a.id === rule.account_id);
+    const acc = accounts.find((a) => a.id === payAccountId);
     if (acc) {
-      const patch = rule.method === "credit"
+      const patch = payMethod === "credit"
         ? { credit_used: Number(acc.credit_used) + Number(rule.amount) }
         : { balance: Number(acc.balance) - Number(rule.amount) };
       await supabase.from("accounts").update(patch).eq("id", acc.id);
