@@ -58,6 +58,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [recurringRules, setRecurringRules] = useState<RecurringRule[]>([]);
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [patterns, setPatterns] = useState<ExpensePattern[]>([]);
+  const [loans, setLoans] = useState<Loan[]>([]);
   const [loading, setLoading] = useState(true);
 
   const setActiveProfile = useCallback((p: Profile | null) => {
