@@ -1,0 +1,1 @@
+GRANT EXECUTE ON FUNCTION public.is_profile_owner(uuid) TO authenticated, anon;
