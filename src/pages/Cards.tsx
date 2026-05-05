@@ -6,6 +6,7 @@ import { useStore } from "@/lib/store";
 import { fmtBRL } from "@/lib/finance";
 import { toast } from "sonner";
 import type { Account, Loan } from "@/lib/types";
+import { ConfirmButton } from "@/components/ConfirmButton";
 
 const ACCOUNT_PRESETS = [
   { name: "Itaú", color: "#ec7000" },
@@ -294,13 +295,15 @@ function CreditRow({ account }: { account: Account }) {
           <p className={`font-display text-sm font-semibold ${pct > 80 ? "text-status-danger" : pct > 50 ? "text-status-warn" : "text-status-safe"}`}>
             {Math.round(pct)}%
           </p>
-          <button
-            onClick={() => { if (confirm(`Remover ${account.name}?`)) removeAccount(account.id); }}
+          <ConfirmButton
+            onConfirm={() => removeAccount(account.id)}
+            title={`Remover ${account.name}?`}
+            description="Esta ação não pode ser desfeita."
             className="text-muted-foreground hover:text-status-danger"
-            aria-label="Remover"
+            ariaLabel="Remover"
           >
             <Trash2 className="h-4 w-4" />
-          </button>
+          </ConfirmButton>
         </div>
       </div>
 
@@ -525,9 +528,15 @@ function LoanRow({ loan }: { loan: Loan }) {
             <p className="text-[11px] text-muted-foreground">Pagamento todo dia {loan.payment_day}</p>
           </div>
         </div>
-        <button onClick={() => { if (confirm(`Remover empréstimo ${loan.bank}?`)) removeLoan(loan.id); }} className="text-muted-foreground hover:text-status-danger" aria-label="Remover">
+        <ConfirmButton
+          onConfirm={() => removeLoan(loan.id)}
+          title={`Remover empréstimo ${loan.bank}?`}
+          description="Esta ação não pode ser desfeita."
+          className="text-muted-foreground hover:text-status-danger"
+          ariaLabel="Remover"
+        >
           <Trash2 className="h-4 w-4" />
-        </button>
+        </ConfirmButton>
       </div>
 
       <div className="mt-3 grid grid-cols-3 gap-2 text-center">
