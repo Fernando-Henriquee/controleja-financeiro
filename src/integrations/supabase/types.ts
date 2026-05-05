@@ -336,36 +336,42 @@ export type Database = {
           account_id: string
           amount: number
           applied_months: string[]
+          auto_apply: boolean
           category: string
           created_at: string
           day_of_month: number
           description: string
           id: string
           method: string
+          paid_months: string[]
           profile_id: string
         }
         Insert: {
           account_id: string
           amount: number
           applied_months?: string[]
+          auto_apply?: boolean
           category?: string
           created_at?: string
           day_of_month: number
           description: string
           id?: string
           method: string
+          paid_months?: string[]
           profile_id: string
         }
         Update: {
           account_id?: string
           amount?: number
           applied_months?: string[]
+          auto_apply?: boolean
           category?: string
           created_at?: string
           day_of_month?: number
           description?: string
           id?: string
           method?: string
+          paid_months?: string[]
           profile_id?: string
         }
         Relationships: [
