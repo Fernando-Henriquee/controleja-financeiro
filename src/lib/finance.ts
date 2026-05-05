@@ -196,3 +196,139 @@ export function monthLabel(key: string): string {
   const { year, month } = parseMonthKey(key);
   return new Date(year, month - 1, 1).toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
 }
+
+// ---- Calendar helpers ----
+export type DayCell = {
+  date: Date;
+  day: number;
+  isWeekend: boolean;
+  isToday: boolean;
+  isPast: boolean;
+  isFuture: boolean;
+  inMonth: boolean;
+  spent: number;          // actual spent that day (past/today)
+  projected: number;      // projected spend that day (future)
+  dailyLimit: number;     // even daily limit for that day from remaining budget
+  cumulativeBalance: number; // remaining budget after this day
+  status: "safe" | "warn" | "danger" | "future-safe" | "future-danger" | "empty";
+};
+
+export type MonthCalendar = {
+  cells: DayCell[];        // padded to start on Sunday (length multiple of 7)
+  monthDays: DayCell[];    // only days in the month
+  income: number;
+  spentSoFar: number;
+  remaining: number;
+  remainingDays: number;
+  evenDailyLimit: number;  // remaining / remainingDays
+  projectedTotal: number;  // spent + projected for future days at evenDailyLimit
+  endBalance: number;      // income - projectedTotal
+};
+
+export function buildMonthCalendar(
+  monthKeyStr: string,
+  income: Income,
+  expenses: Expense[],
+  extraDailyProjection?: number,
+): MonthCalendar {
+  const { year, month } = parseMonthKey(monthKeyStr);
+  const firstDay = new Date(year, month - 1, 1);
+  const lastDay = new Date(year, month, 0);
+  const totalDays = lastDay.getDate();
+  const today = new Date();
+  const todayKey = today.toDateString();
+  const isCurrentMonth = today.getFullYear() === year && today.getMonth() === month - 1;
+
+  // group expenses by day-of-month
+  const byDay = new Map<number, number>();
+  for (const e of expenses) {
+    const d = new Date(e.occurred_at);
+    if (d.getFullYear() === year && d.getMonth() === month - 1) {
+      byDay.set(d.getDate(), (byDay.get(d.getDate()) ?? 0) + Number(e.amount));
+    }
+  }
+
+  const totalIncome = expectedMonthlyIncome(income);
+  const spentSoFar = Array.from(byDay.entries())
+    .filter(([d]) => !isCurrentMonth || d <= today.getDate())
+    .reduce((a, [, v]) => a + v, 0);
+
+  // remaining days: future days inclusive of today (for current month); for past months: 0; future months: all days
+  let remainingDays: number;
+  if (isCurrentMonth) {
+    remainingDays = totalDays - today.getDate() + 1;
+  } else if (today > lastDay) {
+    remainingDays = 0;
+  } else {
+    remainingDays = totalDays;
+  }
+  const remaining = totalIncome - spentSoFar;
+  const evenDailyLimit = remainingDays > 0 ? Math.max(0, remaining / remainingDays) : 0;
+  const projectionPerDay = extraDailyProjection ?? evenDailyLimit;
+
+  const monthDays: DayCell[] = [];
+  let cumulative = totalIncome;
+  for (let d = 1; d <= totalDays; d += 1) {
+    const date = new Date(year, month - 1, d);
+    const weekDay = date.getDay();
+    const isWeekend = weekDay === 0 || weekDay === 6;
+    const isToday = date.toDateString() === todayKey;
+    const isPast = isCurrentMonth ? d < today.getDate() : date < firstDay ? false : (date < new Date(today.getFullYear(), today.getMonth(), 1));
+    const isFuture = isCurrentMonth ? d > today.getDate() : date > today;
+    const spent = !isFuture ? (byDay.get(d) ?? 0) : 0;
+    const projected = isFuture ? projectionPerDay : 0;
+    cumulative -= spent + projected;
+
+    let status: DayCell["status"] = "empty";
+    if (isFuture) {
+      status = cumulative < 0 ? "future-danger" : "future-safe";
+    } else if (spent === 0) {
+      status = "empty";
+    } else if (evenDailyLimit > 0 && spent > evenDailyLimit * 1.25) {
+      status = "danger";
+    } else if (evenDailyLimit > 0 && spent > evenDailyLimit * 0.9) {
+      status = "warn";
+    } else {
+      status = "safe";
+    }
+
+    monthDays.push({
+      date, day: d, isWeekend, isToday, isPast, isFuture, inMonth: true,
+      spent, projected, dailyLimit: evenDailyLimit,
+      cumulativeBalance: cumulative,
+      status,
+    });
+  }
+
+  // Pad cells to start on Sunday
+  const leading = firstDay.getDay();
+  const cells: DayCell[] = [];
+  for (let i = 0; i < leading; i += 1) {
+    const date = new Date(year, month - 1, i - leading + 1);
+    cells.push({
+      date, day: date.getDate(), isWeekend: date.getDay() === 0 || date.getDay() === 6,
+      isToday: false, isPast: true, isFuture: false, inMonth: false,
+      spent: 0, projected: 0, dailyLimit: 0, cumulativeBalance: 0, status: "empty",
+    });
+  }
+  cells.push(...monthDays);
+  while (cells.length % 7 !== 0) {
+    const last = cells[cells.length - 1].date;
+    const date = new Date(last.getFullYear(), last.getMonth(), last.getDate() + 1);
+    cells.push({
+      date, day: date.getDate(), isWeekend: date.getDay() === 0 || date.getDay() === 6,
+      isToday: false, isPast: false, isFuture: true, inMonth: false,
+      spent: 0, projected: 0, dailyLimit: 0, cumulativeBalance: 0, status: "empty",
+    });
+  }
+
+  const projectedFuture = monthDays.filter(d => d.isFuture).reduce((a, d) => a + d.projected, 0);
+  const projectedTotal = spentSoFar + projectedFuture;
+  const endBalance = totalIncome - projectedTotal;
+
+  return {
+    cells, monthDays,
+    income: totalIncome, spentSoFar, remaining, remainingDays,
+    evenDailyLimit, projectedTotal, endBalance,
+  };
+}
