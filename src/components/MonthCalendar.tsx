@@ -104,6 +104,31 @@ export function MonthCalendar() {
         <Legend color="bg-rose-500/10 border-rose-500/50 border-dashed" label="Projeção no vermelho" />
       </div>
 
+      {daysElapsed > 0 && daysLeft > 0 && (
+        <div className={cn(
+          "mt-4 rounded-2xl border p-3 text-xs",
+          paceEnd < 0 ? "border-rose-500/40 bg-rose-500/5" : "border-emerald-500/40 bg-emerald-500/5",
+        )}>
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            No seu ritmo atual
+          </p>
+          <p className="mt-1 font-display text-sm">
+            Você está gastando em média{" "}
+            <span className="font-bold tabular-nums">{fmtBRL(avgDaily)}</span>/dia
+            {limit > 0 && (
+              <span className={cn("ml-1 text-[11px]", overUnder > 0 ? "text-rose-500" : "text-emerald-600")}>
+                ({overUnder > 0 ? "+" : ""}{fmtBRL(overUnder)} vs limite de {fmtBRL(limit)})
+              </span>
+            )}.
+          </p>
+          <p className={cn("mt-1 text-xs font-semibold", paceEnd < 0 ? "text-rose-500" : "text-emerald-600")}>
+            {paceEnd < 0
+              ? `Mantendo esse ritmo nos próximos ${daysLeft} dias, você terminaria o mês ${fmtBRL(Math.abs(paceEnd))} no vermelho.`
+              : `Mantendo esse ritmo nos próximos ${daysLeft} dias, você sobraria ${fmtBRL(paceEnd)} no fim do mês.`}
+          </p>
+        </div>
+      )}
+
       <div className="mt-4 rounded-2xl border border-dashed border-border bg-secondary/30 p-3">
         <label className="flex flex-col gap-2 text-xs">
           <span className="font-semibold text-muted-foreground">
