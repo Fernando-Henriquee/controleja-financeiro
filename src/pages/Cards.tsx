@@ -211,13 +211,15 @@ function DebitRow({ account }: { account: Account }) {
         </div>
         <div className="flex items-center gap-3">
           <p className="font-display text-base font-semibold tabular-nums">{fmtBRL(Number(account.balance))}</p>
-          <button
-            onClick={() => { if (confirm(`Remover ${account.name}?`)) removeAccount(account.id); }}
+          <ConfirmButton
+            onConfirm={() => removeAccount(account.id)}
+            title={`Remover ${account.name}?`}
+            description="Esta ação não pode ser desfeita."
             className="text-muted-foreground hover:text-status-danger"
-            aria-label="Remover"
+            ariaLabel="Remover"
           >
             <Trash2 className="h-4 w-4" />
-          </button>
+          </ConfirmButton>
         </div>
       </div>
     </div>
