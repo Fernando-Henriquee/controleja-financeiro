@@ -45,7 +45,7 @@ type Ctx = {
 
 const StoreContext = createContext<Ctx | null>(null);
 
-const DEFAULT_INCOME: Income = { mode: "pj", monthly_salary: 0, hourly_rate: 50, working_days: businessDaysInMonth(), extra_income: 0 };
+const DEFAULT_INCOME: Income = { mode: "pj", monthly_salary: 0, hourly_rate: 0, working_days: 0, extra_income: 0 };
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
@@ -121,18 +121,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setIncome({
         mode: (ir.data.mode as "clt" | "pj") ?? "pj",
         monthly_salary: Number(ir.data.monthly_salary ?? 0),
-        hourly_rate: Number(ir.data.hourly_rate),
-        working_days: Number(ir.data.working_days ?? businessDaysInMonth()),
+        hourly_rate: Number(ir.data.hourly_rate ?? 0),
+        working_days: Number(ir.data.working_days ?? 0),
         extra_income: Number(ir.data.extra_income ?? 0),
       });
     } else if (i.data) {
       setIncome({
         mode: (i.data.mode as "clt" | "pj") ?? "pj",
         monthly_salary: Number(i.data.monthly_salary ?? 0),
-        hourly_rate: Number(i.data.hourly_rate),
-        working_days: Number(i.data.working_days ?? businessDaysInMonth()),
+        hourly_rate: Number(i.data.hourly_rate ?? 0),
+        working_days: Number(i.data.working_days ?? 0),
         extra_income: Number(i.data.extra_income ?? 0),
       });
+    } else {
+      setIncome(DEFAULT_INCOME);
     }
   }, [activeProfile, selectedMonth]);
 
@@ -303,20 +305,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const updateIncome = useCallback(async (patch: Partial<Income>) => {
     if (!activeProfile) return;
     const next = { ...income, ...patch };
-    if (next.mode === "pj") {
-      next.working_days = businessDaysInMonth();
-    }
     setIncome(next);
-    await supabase.from("income_settings").upsert({
-      profile_id: activeProfile.id,
-      ...next,
-    });
-    await supabase.from("income_records").upsert({
-      profile_id: activeProfile.id,
-      month_key: selectedMonth,
-      ...next,
-      updated_at: new Date().toISOString(),
-    });
+    const payload = {
+      mode: next.mode,
+      monthly_salary: next.monthly_salary,
+      hourly_rate: next.hourly_rate,
+      working_days: next.working_days,
+      extra_income: next.extra_income,
+    };
+    await supabase.from("income_settings").upsert({ profile_id: activeProfile.id, ...payload });
+    await supabase.from("income_records").upsert(
+      { profile_id: activeProfile.id, month_key: selectedMonth, ...payload, updated_at: new Date().toISOString() },
+      { onConflict: "profile_id,month_key" },
+    );
   }, [income, activeProfile, selectedMonth]);
 
   useEffect(() => {
