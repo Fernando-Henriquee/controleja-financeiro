@@ -259,7 +259,7 @@ export function AutomationPanel() {
                   </button>
                 </div>
 
-                <div className="mt-2 flex gap-2">
+                <div className="mt-2 space-y-2">
                   {paid ? (
                     <button
                       onClick={() => void unmarkRecurringPaid(r.id, selectedMonth)}
@@ -267,9 +267,59 @@ export function AutomationPanel() {
                     >
                       <Undo2 className="h-3 w-3" /> Desfazer pagamento
                     </button>
+                  ) : payingId === r.id ? (
+                    <div className="rounded-xl border border-primary/40 bg-primary/5 p-2 space-y-2">
+                      <p className="text-[11px] font-semibold text-foreground">Como você pagou?</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <select
+                          value={payMethod}
+                          onChange={(e) => setPayMethod(e.target.value as PaymentMethod)}
+                          className="rounded-lg border border-border bg-background px-2 py-1.5 text-[11px] outline-none focus:border-primary"
+                        >
+                          <option value="debit">Débito</option>
+                          <option value="pix">PIX</option>
+                          <option value="credit">Crédito (vai pra fatura)</option>
+                          <option value="cash">Dinheiro</option>
+                        </select>
+                        <select
+                          value={payAccountId}
+                          onChange={(e) => setPayAccountId(e.target.value)}
+                          className="rounded-lg border border-border bg-background px-2 py-1.5 text-[11px] outline-none focus:border-primary"
+                        >
+                          {accounts
+                            .filter((a) => payMethod === "credit" ? a.kind === "credit" : a.kind === "debit")
+                            .map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                        </select>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={async () => {
+                            const filtered = accounts.filter((a) => payMethod === "credit" ? a.kind === "credit" : a.kind === "debit");
+                            const accId = payAccountId && filtered.some((a) => a.id === payAccountId) ? payAccountId : filtered[0]?.id;
+                            if (!accId) { toast.error(`Cadastre uma conta de ${payMethod === "credit" ? "crédito" : "débito"} antes.`); return; }
+                            await markRecurringPaid(r.id, selectedMonth, { account_id: accId, method: payMethod });
+                            toast.success(payMethod === "credit" ? "Pagamento somado na fatura do cartão." : "Pagamento registrado.");
+                            setPayingId(null);
+                          }}
+                          className="flex items-center gap-1 rounded-lg bg-primary px-2 py-1 text-[11px] font-semibold text-primary-foreground hover:opacity-90"
+                        >
+                          <CheckCircle2 className="h-3 w-3" /> Confirmar pagamento
+                        </button>
+                        <button
+                          onClick={() => setPayingId(null)}
+                          className="rounded-lg border border-border bg-card px-2 py-1 text-[11px] hover:border-primary"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
                   ) : (
                     <button
-                      onClick={() => void markRecurringPaid(r.id, selectedMonth)}
+                      onClick={() => {
+                        setPayingId(r.id);
+                        setPayMethod(r.method);
+                        setPayAccountId(r.account_id);
+                      }}
                       className="flex items-center gap-1 rounded-lg bg-emerald-500/10 px-2 py-1 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-500/20"
                     >
                       <CheckCircle2 className="h-3 w-3" /> Marcar como paga
