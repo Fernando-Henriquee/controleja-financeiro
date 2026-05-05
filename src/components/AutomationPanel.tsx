@@ -188,8 +188,8 @@ export function AutomationPanel() {
               className="mt-0.5"
             />
             <span>
-              <span className="font-semibold">Lançar automaticamente</span> no dia do vencimento.
-              <span className="ml-1 text-muted-foreground">Se desativado, você marca como paga manualmente.</span>
+              <span className="font-semibold">Lançar automaticamente</span> no dia do vencimento usando a conta e método sugeridos acima.
+              <span className="ml-1 text-muted-foreground">Se desativado (recomendado), você marca como paga manualmente e escolhe na hora se foi débito, PIX, crédito ou dinheiro.</span>
             </span>
           </label>
 
