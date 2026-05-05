@@ -419,7 +419,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const rule = recurringRules.find((r) => r.id === ruleId);
     if (!rule) return;
     // Remove the expense tagged for this rule + month
-    const tag = `recurrente:${ruleId}:${mKey}`.replace("recurrente", "recorrente");
+    const tag = `recorrente:${ruleId}:${mKey}`;
     const { data: exps } = await supabase.from("expenses").select("*").eq("raw", tag);
     for (const e of (exps ?? []) as Expense[]) {
       await supabase.from("expenses").delete().eq("id", e.id);
