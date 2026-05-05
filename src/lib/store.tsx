@@ -90,11 +90,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const refresh = useCallback(async () => {
     if (!activeProfile) {
       setAccounts([]); setExpenses([]); setIncome(DEFAULT_INCOME);
-      setRecurringRules([]); setReminders([]); setPatterns([]);
+      setRecurringRules([]); setReminders([]); setPatterns([]); setLoans([]);
       return;
     }
     const range = monthDateRange(selectedMonth);
-    const [a, e, i, ir, rr, re, ep] = await Promise.all([
+    const [a, e, i, ir, rr, re, ep, ln] = await Promise.all([
       supabase.from("accounts").select("*").eq("profile_id", activeProfile.id).order("position"),
       supabase
         .from("expenses")
@@ -109,12 +109,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       supabase.from("recurring_rules").select("*").eq("profile_id", activeProfile.id).order("created_at", { ascending: false }),
       supabase.from("reminders").select("*").eq("profile_id", activeProfile.id).order("created_at", { ascending: false }),
       supabase.from("expense_patterns").select("*").eq("profile_id", activeProfile.id).order("use_count", { ascending: false }).limit(200),
+      supabase.from("loans").select("*").eq("profile_id", activeProfile.id).order("created_at", { ascending: false }),
     ]);
     setAccounts((a.data ?? []) as Account[]);
     setExpenses((e.data ?? []) as Expense[]);
     setRecurringRules((rr.data ?? []) as RecurringRule[]);
     setReminders((re.data ?? []) as Reminder[]);
     setPatterns((ep.data ?? []) as ExpensePattern[]);
+    setLoans((ln.data ?? []) as Loan[]);
     if (ir.data) {
       setIncome({
         mode: (ir.data.mode as "clt" | "pj") ?? "pj",
