@@ -15,6 +15,23 @@ export function MonthCalendar() {
     [selectedMonth, income, expenses],
   );
 
+  // Average daily spend so far (based on days that already had any activity / elapsed days of the month)
+  const { avgDaily, daysElapsed, daysLeft } = useMemo(() => {
+    const today = new Date();
+    const [y, m] = selectedMonth.split("-").map(Number);
+    const isCurrent = today.getFullYear() === y && today.getMonth() === m - 1;
+    const elapsed = isCurrent ? today.getDate() : real.monthDays.length;
+    const left = Math.max(0, real.monthDays.length - elapsed);
+    const avg = elapsed > 0 ? real.spentSoFar / elapsed : 0;
+    return { avgDaily: avg, daysElapsed: elapsed, daysLeft: left };
+  }, [selectedMonth, real]);
+
+  // Default projection: keep spending at current average pace
+  const paceProjection = useMemo(
+    () => buildMonthCalendar(selectedMonth, income, expenses, avgDaily > 0 ? avgDaily : undefined),
+    [selectedMonth, income, expenses, avgDaily],
+  );
+
   // Simulation: replace future projection with `simSpend` per day
   const sim = useMemo(
     () => buildMonthCalendar(selectedMonth, income, expenses, simSpend > 0 ? simSpend : undefined),
@@ -25,6 +42,9 @@ export function MonthCalendar() {
   const view = useSim ? sim : real;
 
   const monthName = monthLabel(selectedMonth);
+  const paceEnd = paceProjection.endBalance;
+  const limit = real.evenDailyLimit;
+  const overUnder = avgDaily - limit;
 
   return (
     <div className="rounded-3xl border border-border bg-card p-4 shadow-sm">
