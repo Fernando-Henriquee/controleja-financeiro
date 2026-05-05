@@ -22,17 +22,24 @@ type Ctx = {
   recurringRules: RecurringRule[];
   reminders: Reminder[];
   patterns: ExpensePattern[];
+  loans: Loan[];
 
   addExpenseFromText: (text: string) => Promise<{ expense: Expense | null; error?: string }>;
+  addExpenseManual: (input: { amount: number; description: string; category?: string; method: PaymentMethod; account_id: string }) => Promise<{ expense: Expense | null; error?: string }>;
   removeExpense: (id: string) => Promise<void>;
   updateAccountCreditLimit: (accountId: string, creditLimit: number | null) => Promise<void>;
   updateAccountCreditUsed: (accountId: string, creditUsed: number) => Promise<void>;
   addCreditAccount: (name: string, color: string, creditLimit: number) => Promise<void>;
+  addDebitAccount: (name: string, color: string, balance: number) => Promise<void>;
+  removeAccount: (id: string) => Promise<void>;
   updateIncome: (patch: Partial<Income>) => Promise<void>;
   addRecurringRule: (rule: Omit<RecurringRule, "id" | "profile_id" | "applied_months">) => Promise<void>;
   removeRecurringRule: (id: string) => Promise<void>;
   addReminder: (reminder: Omit<Reminder, "id" | "profile_id">) => Promise<void>;
   removeReminder: (id: string) => Promise<void>;
+  addLoan: (loan: Omit<Loan, "id" | "profile_id">) => Promise<void>;
+  updateLoan: (id: string, patch: Partial<Omit<Loan, "id" | "profile_id">>) => Promise<void>;
+  removeLoan: (id: string) => Promise<void>;
   refresh: () => Promise<void>;
 };
 
