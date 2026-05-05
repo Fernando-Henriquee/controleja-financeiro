@@ -9,6 +9,9 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
+    "db:link": "npx supabase link",
+    "db:push": "npx supabase db push",
+    "db:status": "npx supabase migration list",
     "test": "vitest run",
     "test:watch": "vitest"
   },

@@ -1,12 +1,13 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { ArrowLeft, CreditCard, Landmark, Plus, Trash2, Wallet, Receipt } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useStore } from "@/lib/store";
-import { fmtBRL } from "@/lib/finance";
+import { fmtBRL, installmentDueForMonth } from "@/lib/finance";
 import { toast } from "sonner";
 import type { Account, Loan } from "@/lib/types";
 import { ConfirmButton } from "@/components/ConfirmButton";
+import { MoneyInput } from "@/components/MoneyInput";
 
 const ACCOUNT_PRESETS = [
   { name: "Itaú", color: "#ec7000" },
@@ -94,8 +95,8 @@ function AddAccountForm() {
   const { addCreditAccount, addDebitAccount } = useStore();
   const [kind, setKind] = useState<"debit" | "credit">("credit");
   const [name, setName] = useState("");
-  const [limit, setLimit] = useState("");
-  const [balance, setBalance] = useState("");
+  const [limit, setLimit] = useState(0);
+  const [balance, setBalance] = useState(0);
   const [color, setColor] = useState("#3b82f6");
 
   function pickPreset(p: { name: string; color: string }) {
@@ -109,17 +110,15 @@ function AddAccountForm() {
       return;
     }
     if (kind === "credit") {
-      const l = parseFloat(limit.replace(",", "."));
-      if (!Number.isFinite(l) || l <= 0) {
+      if (!Number.isFinite(limit) || limit <= 0) {
         toast.error("Informe o limite do cartão.");
         return;
       }
-      await addCreditAccount(name.trim(), color, l);
+      await addCreditAccount(name.trim(), color, limit);
     } else {
-      const b = parseFloat((balance || "0").replace(",", "."));
-      await addDebitAccount(name.trim(), color, Number.isFinite(b) ? b : 0);
+      await addDebitAccount(name.trim(), color, Math.max(0, Number.isFinite(balance) ? balance : 0));
     }
-    setName(""); setLimit(""); setBalance("");
+    setName(""); setLimit(0); setBalance(0);
     toast.success("Conta adicionada.");
   }
 
@@ -159,20 +158,16 @@ function AddAccountForm() {
           className="rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
         />
         {kind === "credit" ? (
-          <input
-            type="number"
-            inputMode="decimal"
+          <MoneyInput
             value={limit}
-            onChange={(e) => setLimit(e.target.value)}
+            onChange={setLimit}
             placeholder="Limite"
             className="rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
           />
         ) : (
-          <input
-            type="number"
-            inputMode="decimal"
+          <MoneyInput
             value={balance}
-            onChange={(e) => setBalance(e.target.value)}
+            onChange={setBalance}
             placeholder="Saldo inicial"
             className="rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
           />
@@ -227,13 +222,39 @@ function DebitRow({ account }: { account: Account }) {
 }
 
 function CreditRow({ account }: { account: Account }) {
-  const { updateAccountCreditLimit, updateAccountCreditUsed, addExpenseManual, removeAccount, expenses } = useStore();
-  const [draftLimit, setDraftLimit] = useState(String(account.credit_limit ?? 0));
-  const [draftTotal, setDraftTotal] = useState(String(account.credit_used));
-  const [exp, setExp] = useState({ amount: "", description: "", category: "" });
+  const {
+    updateAccountCreditLimit,
+    updateAccountCreditUsed,
+    addExpenseManual,
+    removeAccount,
+    expenses,
+    selectedMonth,
+    installmentPlans,
+    addInstallmentPlan,
+    updateInstallmentPlan,
+    removeInstallmentPlan,
+  } = useStore();
+  const plansForCard = installmentPlans.filter((p) => p.account_id === account.id);
+  const [draftLimit, setDraftLimit] = useState(() => Number(account.credit_limit ?? 0));
+  const [draftTotal, setDraftTotal] = useState(() => Number(account.credit_used));
+  const [exp, setExp] = useState({ amount: 0, description: "", category: "" });
   const [showExpense, setShowExpense] = useState(false);
   const [savingLimit, setSavingLimit] = useState(false);
   const [savingTotal, setSavingTotal] = useState(false);
+  const [planModal, setPlanModal] = useState(false);
+  const [planDesc, setPlanDesc] = useState("");
+  const [planTotal, setPlanTotal] = useState(0);
+  const [planCount, setPlanCount] = useState(12);
+  const [planStartMonth, setPlanStartMonth] = useState(selectedMonth);
+
+  useEffect(() => {
+    setPlanStartMonth(selectedMonth);
+  }, [selectedMonth]);
+
+  useEffect(() => {
+    setDraftLimit(Number(account.credit_limit ?? 0));
+    setDraftTotal(Number(account.credit_used));
+  }, [account.id, account.credit_limit, account.credit_used]);
 
   const used = Number(account.credit_used);
   const limit = Number(account.credit_limit ?? 0);
@@ -245,21 +266,20 @@ function CreditRow({ account }: { account: Account }) {
 
   async function saveLimit() {
     setSavingLimit(true);
-    const v = draftLimit.trim() === "" ? null : Math.max(0, parseFloat(draftLimit.replace(",", ".")) || 0);
-    await updateAccountCreditLimit(account.id, v);
+    await updateAccountCreditLimit(account.id, Math.max(0, draftLimit));
     setSavingLimit(false);
     toast.success("Limite atualizado.");
   }
 
   async function saveTotal() {
     setSavingTotal(true);
-    await updateAccountCreditUsed(account.id, Math.max(0, parseFloat(draftTotal.replace(",", ".")) || 0));
+    await updateAccountCreditUsed(account.id, Math.max(0, draftTotal));
     setSavingTotal(false);
     toast.success("Fatura ajustada.");
   }
 
   async function submitExpense() {
-    const amt = parseFloat(exp.amount.replace(",", "."));
+    const amt = exp.amount;
     if (!Number.isFinite(amt) || amt <= 0) {
       toast.error("Valor inválido.");
       return;
@@ -273,9 +293,9 @@ function CreditRow({ account }: { account: Account }) {
     });
     if (r.expense) {
       toast.success(`${fmtBRL(amt)} lançado em ${account.name}.`);
-      setExp({ amount: "", description: "", category: "" });
+      setExp({ amount: 0, description: "", category: "" });
       setShowExpense(false);
-      setDraftTotal(String(Number(account.credit_used) + amt));
+      setDraftTotal(Number(account.credit_used) + amt);
     } else {
       toast.error(r.error ?? "Falha ao lançar.");
     }
@@ -329,11 +349,9 @@ function CreditRow({ account }: { account: Account }) {
         <div>
           <label className="text-[11px] uppercase tracking-wider text-muted-foreground">Limite</label>
           <div className="mt-1 grid grid-cols-[1fr_auto] gap-1.5">
-            <input
-              type="number"
-              inputMode="decimal"
+            <MoneyInput
               value={draftLimit}
-              onChange={(e) => setDraftLimit(e.target.value)}
+              onChange={setDraftLimit}
               className="rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
             />
             <button onClick={saveLimit} disabled={savingLimit} className="rounded-xl bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-60">
@@ -344,11 +362,9 @@ function CreditRow({ account }: { account: Account }) {
         <div>
           <label className="text-[11px] uppercase tracking-wider text-muted-foreground">Fatura total atual</label>
           <div className="mt-1 grid grid-cols-[1fr_auto] gap-1.5">
-            <input
-              type="number"
-              inputMode="decimal"
+            <MoneyInput
               value={draftTotal}
-              onChange={(e) => setDraftTotal(e.target.value)}
+              onChange={setDraftTotal}
               className="rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
             />
             <button onClick={saveTotal} disabled={savingTotal} className="rounded-xl border border-border px-3 py-2 text-xs font-semibold hover:border-primary disabled:opacity-60">
@@ -377,11 +393,9 @@ function CreditRow({ account }: { account: Account }) {
         ) : (
           <div className="space-y-2 rounded-xl bg-secondary/50 p-3">
             <div className="grid gap-2 sm:grid-cols-[110px_1fr_140px]">
-              <input
-                type="number"
-                inputMode="decimal"
+              <MoneyInput
                 value={exp.amount}
-                onChange={(e) => setExp({ ...exp, amount: e.target.value })}
+                onChange={(v) => setExp({ ...exp, amount: v })}
                 placeholder="Valor"
                 autoFocus
                 className="rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
@@ -410,6 +424,148 @@ function CreditRow({ account }: { account: Account }) {
           </div>
         )}
       </div>
+
+      <div className="mt-3 border-t border-border pt-3">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Compras parceladas</p>
+          <button
+            type="button"
+            onClick={() => setPlanModal(true)}
+            className="text-[11px] font-semibold text-primary hover:underline"
+          >
+            + Nova compra parcelada
+          </button>
+        </div>
+        {plansForCard.length > 0 ? (
+          <ul className="mt-2 space-y-2">
+            {plansForCard.map((plan) => {
+              const dueNow = installmentDueForMonth(plan, selectedMonth);
+              const active = plan.paid_installments < plan.installment_count;
+              return (
+                <li
+                  key={plan.id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-secondary/40 px-3 py-2 text-xs"
+                >
+                  <div>
+                    <p className="font-medium">{plan.description || "Compra parcelada"}</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {fmtBRL(plan.installment_amount)} · {plan.paid_installments}/{plan.installment_count} parcelas
+                      {dueNow ? (
+                        <span className="ml-1 text-status-warn"> · vence neste mês</span>
+                      ) : null}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    {active && dueNow ? (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await updateInstallmentPlan(plan.id, { paid_installments: plan.paid_installments + 1 });
+                          toast.success("Parcela registrada como paga.");
+                        }}
+                        className="rounded-lg bg-primary px-2 py-1 text-[10px] font-semibold text-primary-foreground"
+                      >
+                        Marcar paga
+                      </button>
+                    ) : null}
+                    <ConfirmButton
+                      onConfirm={() => removeInstallmentPlan(plan.id)}
+                      title="Remover compra parcelada?"
+                      description="Esta ação não pode ser desfeita."
+                      className="text-muted-foreground hover:text-status-danger"
+                      ariaLabel="Remover compra"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </ConfirmButton>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <p className="mt-1 text-[11px] text-muted-foreground">Nenhuma compra parcelada neste cartão.</p>
+        )}
+      </div>
+
+      {planModal ? (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm sm:items-center" onClick={() => setPlanModal(false)}>
+          <div className="w-full max-w-md rounded-t-3xl bg-card p-5 shadow-lg sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
+            <p className="font-display text-sm font-semibold">Nova compra parcelada — {account.name}</p>
+            <div className="mt-3 space-y-3">
+              <label className="block">
+                <span className="text-[11px] text-muted-foreground">Descrição</span>
+                <input
+                  value={planDesc}
+                  onChange={(e) => setPlanDesc(e.target.value)}
+                  placeholder="Ex: TV loja X"
+                  className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+                />
+              </label>
+              <label className="block">
+                <span className="text-[11px] text-muted-foreground">Valor total</span>
+                <MoneyInput
+                  value={planTotal}
+                  onChange={setPlanTotal}
+                  className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+                />
+              </label>
+              <label className="block">
+                <span className="text-[11px] text-muted-foreground">Nº de parcelas</span>
+                <input
+                  type="number"
+                  min={1}
+                  value={planCount}
+                  onChange={(e) => setPlanCount(Math.max(1, parseInt(e.target.value || "1", 10)))}
+                  className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+                />
+              </label>
+              <label className="block">
+                <span className="text-[11px] text-muted-foreground">Primeira cobrança (mês)</span>
+                <input
+                  type="month"
+                  value={planStartMonth}
+                  onChange={(e) => setPlanStartMonth(e.target.value)}
+                  className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+                />
+              </label>
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button type="button" onClick={() => setPlanModal(false)} className="rounded-lg px-3 py-2 text-xs text-muted-foreground hover:text-foreground">
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const count = Math.max(1, planCount);
+                  const total = planTotal;
+                  if (!(total > 0)) {
+                    toast.error("Informe o valor total.");
+                    return;
+                  }
+                  const inst = Math.round((total / count) * 100) / 100;
+                  await addInstallmentPlan({
+                    account_id: account.id,
+                    description: planDesc.trim() || "Compra parcelada",
+                    total_amount: total,
+                    installment_count: count,
+                    installment_amount: inst,
+                    first_month_key: planStartMonth,
+                    paid_installments: 0,
+                  });
+                  setPlanDesc("");
+                  setPlanTotal(0);
+                  setPlanCount(12);
+                  setPlanModal(false);
+                  toast.success("Compra parcelada registrada.");
+                }}
+                className="rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground"
+              >
+                Salvar
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -418,14 +574,14 @@ function AddLoanForm() {
   const { addLoan } = useStore();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({
-    bank: "", total_amount: "", installment_amount: "",
+    bank: "", total_amount: 0, installment_amount: 0,
     total_installments: "", paid_installments: "0", payment_day: "5", notes: "",
   });
 
   async function submit() {
     if (!form.bank.trim()) { toast.error("Informe o banco."); return; }
-    const total = parseFloat(form.total_amount.replace(",", ".")) || 0;
-    const inst = parseFloat(form.installment_amount.replace(",", ".")) || 0;
+    const total = form.total_amount;
+    const inst = form.installment_amount;
     const totalInst = parseInt(form.total_installments) || 1;
     const paidInst = parseInt(form.paid_installments) || 0;
     const day = Math.min(31, Math.max(1, parseInt(form.payment_day) || 1));
@@ -439,7 +595,7 @@ function AddLoanForm() {
       payment_day: day,
       notes: form.notes.trim() || null,
     });
-    setForm({ bank: "", total_amount: "", installment_amount: "", total_installments: "", paid_installments: "0", payment_day: "5", notes: "" });
+    setForm({ bank: "", total_amount: 0, installment_amount: 0, total_installments: "", paid_installments: "0", payment_day: "5", notes: "" });
     setOpen(false);
     toast.success("Empréstimo adicionado.");
   }
@@ -466,10 +622,20 @@ function AddLoanForm() {
           <input type="number" min="1" max="31" value={form.payment_day} onChange={(e) => setForm({ ...form, payment_day: e.target.value })} className="loan-input" />
         </Field>
         <Field label="Valor total">
-          <input type="number" inputMode="decimal" value={form.total_amount} onChange={(e) => setForm({ ...form, total_amount: e.target.value })} placeholder="0,00" className="loan-input" />
+          <MoneyInput
+            value={form.total_amount}
+            onChange={(v) => setForm({ ...form, total_amount: v })}
+            placeholder="0,00"
+            className="loan-input"
+          />
         </Field>
         <Field label="Valor da parcela">
-          <input type="number" inputMode="decimal" value={form.installment_amount} onChange={(e) => setForm({ ...form, installment_amount: e.target.value })} placeholder="0,00" className="loan-input" />
+          <MoneyInput
+            value={form.installment_amount}
+            onChange={(v) => setForm({ ...form, installment_amount: v })}
+            placeholder="0,00"
+            className="loan-input"
+          />
         </Field>
         <Field label="Total de parcelas">
           <input type="number" min="1" value={form.total_installments} onChange={(e) => setForm({ ...form, total_installments: e.target.value })} placeholder="Ex: 24" className="loan-input" />

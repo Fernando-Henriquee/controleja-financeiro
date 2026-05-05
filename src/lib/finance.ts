@@ -1,4 +1,4 @@
-import type { Account, Expense, Income, PaymentMethod } from "./types";
+import type { Account, Expense, Income, InstallmentPlan, Loan, PaymentMethod } from "./types";
 
 export const CATEGORY_KEYWORDS: Record<string, string[]> = {
   Alimentação: ["almoço","almoco","jantar","café","cafe","lanche","comida","ifood","rappi","restaurante","padaria","mercado","supermercado"],
@@ -131,6 +131,60 @@ export function dailyLimit(income: Income, expenses: Expense[]): number {
   return Math.max(0, remaining / daysRemaining());
 }
 
+/** Meses entre firstMonthKey (inclusive) e monthKey — 0 se for o mesmo mês. */
+export function monthsBetweenMonthKeys(firstMonthKey: string, monthKey: string): number {
+  const [y1, m1] = firstMonthKey.split("-").map(Number);
+  const [y2, m2] = monthKey.split("-").map(Number);
+  return (y2 - y1) * 12 + (m2 - m1);
+}
+
+/** Parcela da compra ainda pendente neste mês de referência (índice do cronograma). */
+export function installmentDueForMonth(plan: InstallmentPlan, monthKeyStr: string): boolean {
+  const idx = monthsBetweenMonthKeys(plan.first_month_key, monthKeyStr);
+  if (idx < 0 || idx >= plan.installment_count) return false;
+  return idx >= plan.paid_installments;
+}
+
+export function totalInstallmentsDueInMonth(plans: InstallmentPlan[], monthKeyStr: string): number {
+  return plans.reduce(
+    (s, p) => s + (installmentDueForMonth(p, monthKeyStr) ? Number(p.installment_amount) : 0),
+    0,
+  );
+}
+
+/** Empréstimos com parcelas restantes: uma parcela por mês até quitar. */
+export function totalLoanInstallmentsDueInMonth(loans: Loan[]): number {
+  return loans
+    .filter((l) => l.paid_installments < l.total_installments)
+    .reduce((s, l) => s + Number(l.installment_amount), 0);
+}
+
+export function remainingAfterObligations(
+  income: Income,
+  expenses: Expense[],
+  loans: Loan[],
+  installmentPlans: InstallmentPlan[],
+  obligationMonthKey: string,
+): number {
+  const renda = expectedMonthlyIncome(income);
+  const gasto = monthSpent(expenses);
+  const emprestimos = totalLoanInstallmentsDueInMonth(loans);
+  const parcelas = totalInstallmentsDueInMonth(installmentPlans, obligationMonthKey);
+  return renda - gasto - emprestimos - parcelas;
+}
+
+export function dailyLimitRealistic(
+  income: Income,
+  expenses: Expense[],
+  loans: Loan[],
+  installmentPlans: InstallmentPlan[],
+  obligationMonthKey: string,
+): number {
+  const sobra = remainingAfterObligations(income, expenses, loans, installmentPlans, obligationMonthKey);
+  const days = Math.max(1, daysRemaining());
+  return Math.max(0, sobra / days);
+}
+
 export function idealDailyAverage(income: Income): number {
   return Math.max(0, expectedMonthlyIncome(income) / Math.max(1, daysRemaining() + (new Date().getDate() - 1)));
 }
@@ -141,6 +195,22 @@ export function dailyDeviationFromIdeal(income: Income, expenses: Expense[]): nu
 export type Status = "safe" | "warn" | "danger";
 export function dailyStatus(income: Income, expenses: Expense[]): Status {
   const limit = dailyLimit(income, expenses);
+  const spent = todaySpent(expenses);
+  if (limit <= 0 || spent > limit) return "danger";
+  if (spent > limit * 0.75) return "warn";
+  return "safe";
+}
+
+export function dailyStatusRealistic(
+  income: Income,
+  expenses: Expense[],
+  loans: Loan[],
+  plans: InstallmentPlan[],
+  obligationMonthKey: string,
+): Status {
+  const sobra = remainingAfterObligations(income, expenses, loans, plans, obligationMonthKey);
+  if (sobra <= 0) return "danger";
+  const limit = dailyLimitRealistic(income, expenses, loans, plans, obligationMonthKey);
   const spent = todaySpent(expenses);
   if (limit <= 0 || spent > limit) return "danger";
   if (spent > limit * 0.75) return "warn";

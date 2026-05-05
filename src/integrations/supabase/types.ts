@@ -304,6 +304,60 @@ export type Database = {
           },
         ]
       }
+      installment_plans: {
+        Row: {
+          account_id: string
+          created_at: string
+          description: string
+          first_month_key: string
+          id: string
+          installment_amount: number
+          installment_count: number
+          paid_installments: number
+          profile_id: string
+          total_amount: number
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          description?: string
+          first_month_key: string
+          id?: string
+          installment_amount?: number
+          installment_count?: number
+          paid_installments?: number
+          profile_id: string
+          total_amount?: number
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          description?: string
+          first_month_key?: string
+          id?: string
+          installment_amount?: number
+          installment_count?: number
+          paid_installments?: number
+          profile_id?: string
+          total_amount?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "installment_plans_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "installment_plans_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           color: string

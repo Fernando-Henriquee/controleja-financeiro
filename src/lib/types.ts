@@ -32,6 +32,18 @@ export type Loan = {
   notes: string | null;
 };
 
+export type InstallmentPlan = {
+  id: string;
+  profile_id: string;
+  account_id: string;
+  description: string;
+  total_amount: number;
+  installment_count: number;
+  installment_amount: number;
+  first_month_key: string;
+  paid_installments: number;
+};
+
 export type Expense = {
   id: string;
   amount: number;

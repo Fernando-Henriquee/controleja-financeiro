@@ -1,6 +1,7 @@
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode, useState } from "react";
 import { useStore } from "@/lib/store";
 import { businessDaysInMonthKey, expectedMonthlyIncome, fmtBRL, monthLabel } from "@/lib/finance";
+import { MoneyInput } from "@/components/MoneyInput";
 import { Settings2, X } from "lucide-react";
 
 export function IncomeSheet() {
@@ -44,21 +45,42 @@ export function IncomeSheet() {
               </div>
 
               {income.mode === "clt" ? (
-                <Field label="Salário mensal (R$)" value={income.monthly_salary} onChange={(v) => updateIncome({ monthly_salary: v })} />
+                <label className="block">
+                  <span className="text-xs text-muted-foreground">Salário mensal (R$)</span>
+                  <MoneyInput
+                    value={income.monthly_salary}
+                    onChange={(v) => updateIncome({ monthly_salary: v })}
+                    className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+                  />
+                </label>
               ) : (
                 <>
-                  <Field label="Valor hora (R$)" value={income.hourly_rate} onChange={(v) => updateIncome({ hourly_rate: v })} />
+                  <label className="block">
+                    <span className="text-xs text-muted-foreground">Valor hora (R$)</span>
+                    <MoneyInput
+                      value={income.hourly_rate}
+                      onChange={(v) => updateIncome({ hourly_rate: v })}
+                      className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+                    />
+                  </label>
                   <div className="rounded-xl border border-border bg-background px-3 py-2">
                     <p className="text-xs text-muted-foreground">Cálculo PJ ({monthLabel(selectedMonth)})</p>
                     <p className="text-sm font-medium">
-                      R$ {income.hourly_rate} × 8h × <strong>{autoDays}</strong> dias úteis = {fmtBRL(income.hourly_rate * 8 * autoDays)}
+                      {fmtBRL(income.hourly_rate)} × 8h × <strong>{autoDays}</strong> dias úteis = {fmtBRL(income.hourly_rate * 8 * autoDays)}
                     </p>
                     <p className="mt-1 text-[11px] text-muted-foreground">Dias úteis calculados automaticamente para o mês de referência.</p>
                   </div>
                 </>
               )}
 
-              <Field label="Extras (PIX e entradas avulsas) (R$)" value={income.extra_income} onChange={(v) => updateIncome({ extra_income: v })} />
+              <label className="block">
+                <span className="text-xs text-muted-foreground">Extras (PIX e entradas avulsas) (R$)</span>
+                <MoneyInput
+                  value={income.extra_income}
+                  onChange={(v) => updateIncome({ extra_income: v })}
+                  className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+                />
+              </label>
             </div>
             <div className="mt-4 rounded-xl bg-surface p-3">
               <p className="text-xs text-muted-foreground">Renda prevista total</p>
@@ -80,32 +102,5 @@ function ModeButton({ active, onClick, children }: { active: boolean; onClick: (
     >
       {children}
     </button>
-  );
-}
-
-function Field({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
-  const [draft, setDraft] = useState(String(value));
-
-  useEffect(() => {
-    setDraft(String(value));
-  }, [value]);
-
-  return (
-    <label className="block">
-      <span className="text-xs text-muted-foreground">{label}</span>
-      <input
-        type="number"
-        value={draft}
-        onFocus={() => {
-          if (draft === "0") setDraft("");
-        }}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={() => {
-          const parsed = parseFloat(draft.replace(",", "."));
-          onChange(Number.isFinite(parsed) ? parsed : 0);
-        }}
-        className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
-      />
-    </label>
   );
 }

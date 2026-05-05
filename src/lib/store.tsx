@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import type { Account, AccountKind, Expense, ExpensePattern, Income, Loan, PaymentMethod, Profile, RecurringRule, Reminder } from "./types";
+import type { Account, AccountKind, Expense, ExpensePattern, Income, InstallmentPlan, Loan, PaymentMethod, Profile, RecurringRule, Reminder } from "./types";
 import { businessDaysInMonth, businessDaysInMonthKey, monthDateRange, monthKey, parseExpenseWithHistory } from "./finance";
 import { useAuth } from "./auth";
 
@@ -23,6 +23,7 @@ type Ctx = {
   reminders: Reminder[];
   patterns: ExpensePattern[];
   loans: Loan[];
+  installmentPlans: InstallmentPlan[];
 
   addExpenseFromText: (text: string) => Promise<{ expense: Expense | null; error?: string }>;
   addExpenseManual: (input: { amount: number; description: string; category?: string; method: PaymentMethod; account_id: string }) => Promise<{ expense: Expense | null; error?: string }>;
@@ -42,6 +43,9 @@ type Ctx = {
   addLoan: (loan: Omit<Loan, "id" | "profile_id">) => Promise<void>;
   updateLoan: (id: string, patch: Partial<Omit<Loan, "id" | "profile_id">>) => Promise<void>;
   removeLoan: (id: string) => Promise<void>;
+  addInstallmentPlan: (input: Omit<InstallmentPlan, "id" | "profile_id">) => Promise<void>;
+  updateInstallmentPlan: (id: string, patch: Partial<Omit<InstallmentPlan, "id" | "profile_id">>) => Promise<void>;
+  removeInstallmentPlan: (id: string) => Promise<void>;
   refresh: () => Promise<void>;
 };
 
@@ -61,6 +65,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [patterns, setPatterns] = useState<ExpensePattern[]>([]);
   const [loans, setLoans] = useState<Loan[]>([]);
+  const [installmentPlans, setInstallmentPlans] = useState<InstallmentPlan[]>([]);
   const [loading, setLoading] = useState(true);
 
   const setActiveProfile = useCallback((p: Profile | null) => {
@@ -74,6 +79,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (!user) {
       setProfiles([]); setActiveProfileState(null);
       setAccounts([]); setExpenses([]); setIncome(DEFAULT_INCOME);
+      setLoans([]); setInstallmentPlans([]);
       setLoading(false);
       return;
     }
@@ -92,11 +98,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const refresh = useCallback(async () => {
     if (!activeProfile) {
       setAccounts([]); setExpenses([]); setIncome(DEFAULT_INCOME);
-      setRecurringRules([]); setReminders([]); setPatterns([]); setLoans([]);
+      setRecurringRules([]); setReminders([]); setPatterns([]); setLoans([]); setInstallmentPlans([]);
       return;
     }
     const range = monthDateRange(selectedMonth);
-    const [a, e, i, ir, rr, re, ep, ln] = await Promise.all([
+    const [a, e, i, ir, rr, re, ep, ln, ip] = await Promise.all([
       supabase.from("accounts").select("*").eq("profile_id", activeProfile.id).order("position"),
       supabase
         .from("expenses")
@@ -112,6 +118,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       supabase.from("reminders").select("*").eq("profile_id", activeProfile.id).order("created_at", { ascending: false }),
       supabase.from("expense_patterns").select("*").eq("profile_id", activeProfile.id).order("use_count", { ascending: false }).limit(200),
       supabase.from("loans").select("*").eq("profile_id", activeProfile.id).order("created_at", { ascending: false }),
+      supabase.from("installment_plans").select("*").eq("profile_id", activeProfile.id).order("created_at", { ascending: false }),
     ]);
     setAccounts((a.data ?? []) as Account[]);
     setExpenses((e.data ?? []) as Expense[]);
@@ -119,6 +126,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setReminders((re.data ?? []) as Reminder[]);
     setPatterns((ep.data ?? []) as ExpensePattern[]);
     setLoans((ln.data ?? []) as Loan[]);
+    setInstallmentPlans(
+      (ip.data ?? []).map((row) => ({
+        id: row.id,
+        profile_id: row.profile_id,
+        account_id: row.account_id,
+        description: row.description ?? "",
+        total_amount: Number(row.total_amount ?? 0),
+        installment_count: Number(row.installment_count ?? 1),
+        installment_amount: Number(row.installment_amount ?? 0),
+        first_month_key: row.first_month_key,
+        paid_installments: Number(row.paid_installments ?? 0),
+      })),
+    );
     if (ir.data) {
       setIncome({
         mode: (ir.data.mode as "clt" | "pj") ?? "pj",
@@ -475,6 +495,61 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setLoans((prev) => prev.filter((l) => l.id !== id));
   }, []);
 
+  const addInstallmentPlan = useCallback(async (input: Omit<InstallmentPlan, "id" | "profile_id">) => {
+    if (!activeProfile) return;
+    const { data } = await supabase.from("installment_plans").insert({
+      profile_id: activeProfile.id,
+      account_id: input.account_id,
+      description: input.description,
+      total_amount: input.total_amount,
+      installment_count: input.installment_count,
+      installment_amount: input.installment_amount,
+      first_month_key: input.first_month_key,
+      paid_installments: input.paid_installments,
+    }).select().single();
+    if (data) {
+      const row = data as Record<string, unknown>;
+      setInstallmentPlans((prev) => [
+        {
+          id: String(row.id),
+          profile_id: String(row.profile_id),
+          account_id: String(row.account_id),
+          description: String(row.description ?? ""),
+          total_amount: Number(row.total_amount ?? 0),
+          installment_count: Number(row.installment_count ?? 1),
+          installment_amount: Number(row.installment_amount ?? 0),
+          first_month_key: String(row.first_month_key),
+          paid_installments: Number(row.paid_installments ?? 0),
+        },
+        ...prev,
+      ]);
+    }
+  }, [activeProfile]);
+
+  const updateInstallmentPlan = useCallback(async (id: string, patch: Partial<Omit<InstallmentPlan, "id" | "profile_id">>) => {
+    const { data } = await supabase.from("installment_plans").update(patch).eq("id", id).select().single();
+    if (data) {
+      const row = data as Record<string, unknown>;
+      const next: InstallmentPlan = {
+        id: String(row.id),
+        profile_id: String(row.profile_id),
+        account_id: String(row.account_id),
+        description: String(row.description ?? ""),
+        total_amount: Number(row.total_amount ?? 0),
+        installment_count: Number(row.installment_count ?? 1),
+        installment_amount: Number(row.installment_amount ?? 0),
+        first_month_key: String(row.first_month_key),
+        paid_installments: Number(row.paid_installments ?? 0),
+      };
+      setInstallmentPlans((prev) => prev.map((p) => (p.id === id ? next : p)));
+    }
+  }, []);
+
+  const removeInstallmentPlan = useCallback(async (id: string) => {
+    await supabase.from("installment_plans").delete().eq("id", id);
+    setInstallmentPlans((prev) => prev.filter((p) => p.id !== id));
+  }, []);
+
   const effectiveIncome = useMemo<Income>(() => (
     income.mode === "pj"
       ? { ...income, working_days: businessDaysInMonthKey(selectedMonth) }
@@ -484,14 +559,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const value = useMemo<Ctx>(() => ({
     loading, profiles, activeProfile, selectedMonth, setActiveProfile, setSelectedMonth,
     createProfile, deleteProfile,
-    accounts, expenses, income: effectiveIncome, recurringRules, reminders, patterns, loans,
+    accounts, expenses, income: effectiveIncome, recurringRules, reminders, patterns, loans, installmentPlans,
     addExpenseFromText, addExpenseManual, removeExpense,
     updateAccountCreditLimit, updateAccountCreditUsed, addCreditAccount, addDebitAccount, removeAccount,
     updateIncome,
     addRecurringRule, removeRecurringRule, markRecurringPaid, unmarkRecurringPaid, addReminder, removeReminder,
     addLoan, updateLoan, removeLoan,
+    addInstallmentPlan, updateInstallmentPlan, removeInstallmentPlan,
     refresh,
-  }), [loading, profiles, activeProfile, selectedMonth, setActiveProfile, createProfile, deleteProfile, accounts, expenses, effectiveIncome, recurringRules, reminders, patterns, loans, addExpenseFromText, addExpenseManual, removeExpense, updateAccountCreditLimit, updateAccountCreditUsed, addCreditAccount, addDebitAccount, removeAccount, updateIncome, addRecurringRule, removeRecurringRule, markRecurringPaid, unmarkRecurringPaid, addReminder, removeReminder, addLoan, updateLoan, removeLoan, refresh]);
+  }), [loading, profiles, activeProfile, selectedMonth, setActiveProfile, createProfile, deleteProfile, accounts, expenses, effectiveIncome, recurringRules, reminders, patterns, loans, installmentPlans, addExpenseFromText, addExpenseManual, removeExpense, updateAccountCreditLimit, updateAccountCreditUsed, addCreditAccount, addDebitAccount, removeAccount, updateIncome, addRecurringRule, removeRecurringRule, markRecurringPaid, unmarkRecurringPaid, addReminder, removeReminder, addLoan, updateLoan, removeLoan, addInstallmentPlan, updateInstallmentPlan, removeInstallmentPlan, refresh]);
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }

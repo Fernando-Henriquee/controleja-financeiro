@@ -1,26 +1,52 @@
 import { useStore } from "@/lib/store";
-import { dailyLimit, todaySpent, dailyStatus, fmtBRL, daysRemaining, idealDailyAverage, dailyDeviationFromIdeal, monthKey } from "@/lib/finance";
+import {
+  dailyLimit,
+  dailyLimitRealistic,
+  dailyStatus,
+  dailyStatusRealistic,
+  fmtBRL,
+  daysRemaining,
+  idealDailyAverage,
+  dailyDeviationFromIdeal,
+  monthKey,
+  remainingAfterObligations,
+  todaySpent,
+} from "@/lib/finance";
 import { cn } from "@/lib/utils";
 
 export function DailyLimitCard() {
-  const { income, expenses, selectedMonth } = useStore();
+  const { income, expenses, selectedMonth, loans, installmentPlans } = useStore();
   const isCurrentMonth = selectedMonth === monthKey();
-  const limit = dailyLimit(income, expenses);
+
+  const classicLimit = dailyLimit(income, expenses);
+  const realisticLimit = dailyLimitRealistic(income, expenses, loans, installmentPlans, selectedMonth);
+  const limit = isCurrentMonth ? realisticLimit : classicLimit;
+
   const spent = todaySpent(expenses);
-  const status = dailyStatus(income, expenses);
+
+  const status = isCurrentMonth
+    ? dailyStatusRealistic(income, expenses, loans, installmentPlans, selectedMonth)
+    : dailyStatus(income, expenses);
+
   const remaining = Math.max(0, limit - spent);
   const pct = limit > 0 ? Math.min(100, (spent / limit) * 100) : 100;
   const ideal = idealDailyAverage(income);
   const deviation = dailyDeviationFromIdeal(income, expenses);
   const direction = deviation > 0 ? "+" : "-";
 
+  const sobraMes = remainingAfterObligations(income, expenses, loans, installmentPlans, selectedMonth);
+
   const grad = status === "safe" ? "bg-gradient-safe" : status === "warn" ? "bg-gradient-warn" : "bg-gradient-danger";
   const message = !isCurrentMonth
     ? "Visualizacao historica do mes selecionado."
+    : sobraMes <= 0
+    ? "Compromissos (faturas, emprestimos e parcelas) ja consumiram a sobra do mes. Cuidado com qualquer gasto extra."
     : status === "danger"
     ? "Hoje nao e um bom dia para gastar."
     : status === "warn"
-    ? pct > 70 ? "Se continuar assim, vai estourar o mes." : "Voce ja usou 40% do limite do dia."
+    ? pct > 70
+      ? "Se continuar assim, vai estourar o mes."
+      : "Voce ja usou 40% do limite do dia."
     : "Voce esta dentro do limite diario.";
 
   return (
@@ -37,6 +63,9 @@ export function DailyLimitCard() {
         <p className="mt-1 text-xs text-white/80">
           de {fmtBRL(limit)} • gasto hoje {fmtBRL(spent)}
         </p>
+        {isCurrentMonth && sobraMes <= 0 ? (
+          <p className="mt-1 text-xs font-medium text-white">Sobra apos compromissos: {fmtBRL(sobraMes)}</p>
+        ) : null}
         <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-white/20">
           <div className="h-full rounded-full bg-white transition-all duration-500" style={{ width: `${pct}%` }} />
         </div>

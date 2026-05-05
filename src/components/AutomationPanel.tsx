@@ -5,6 +5,7 @@ import type { PaymentMethod } from "@/lib/types";
 import { Bell, CalendarPlus, CheckCircle2, Plus, Repeat2, Trash2, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { MoneyInput } from "@/components/MoneyInput";
 
 const CATEGORIES = ["Moradia", "Transporte", "Lazer", "Saúde", "Educação", "Assinatura", "Financiamento", "Outros"];
 const SUGGESTIONS = [
@@ -136,13 +137,12 @@ export function AutomationPanel() {
               className="rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary sm:col-span-2"
             />
             <label className="flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2 text-sm">
-              <span className="text-xs text-muted-foreground">R$</span>
-              <input
-                type="number"
-                value={amount || ""}
-                onChange={(e) => setAmount(parseFloat(e.target.value) || 0)}
+              <span className="text-xs text-muted-foreground shrink-0">R$</span>
+              <MoneyInput
+                value={amount}
+                onChange={setAmount}
                 placeholder="0,00"
-                className="w-full bg-transparent outline-none"
+                className="min-w-0 flex-1 bg-transparent outline-none"
               />
             </label>
             <label className="flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2 text-sm">
