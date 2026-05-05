@@ -305,20 +305,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const updateIncome = useCallback(async (patch: Partial<Income>) => {
     if (!activeProfile) return;
     const next = { ...income, ...patch };
-    if (next.mode === "pj") {
-      next.working_days = businessDaysInMonth();
-    }
     setIncome(next);
-    await supabase.from("income_settings").upsert({
-      profile_id: activeProfile.id,
-      ...next,
-    });
-    await supabase.from("income_records").upsert({
-      profile_id: activeProfile.id,
-      month_key: selectedMonth,
-      ...next,
-      updated_at: new Date().toISOString(),
-    });
+    const payload = {
+      mode: next.mode,
+      monthly_salary: next.monthly_salary,
+      hourly_rate: next.hourly_rate,
+      working_days: next.working_days,
+      extra_income: next.extra_income,
+    };
+    await supabase.from("income_settings").upsert({ profile_id: activeProfile.id, ...payload });
+    await supabase.from("income_records").upsert(
+      { profile_id: activeProfile.id, month_key: selectedMonth, ...payload, updated_at: new Date().toISOString() },
+      { onConflict: "profile_id,month_key" },
+    );
   }, [income, activeProfile, selectedMonth]);
 
   useEffect(() => {
