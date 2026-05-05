@@ -42,6 +42,9 @@ export function AutomationPanel() {
   const [category, setCategory] = useState("Moradia");
   const [method, setMethod] = useState<PaymentMethod>("debit");
   const [autoApply, setAutoApply] = useState(false);
+  const [payingId, setPayingId] = useState<string | null>(null);
+  const [payMethod, setPayMethod] = useState<PaymentMethod>("debit");
+  const [payAccountId, setPayAccountId] = useState<string>("");
 
   const today = new Date();
   const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
