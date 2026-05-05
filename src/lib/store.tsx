@@ -180,13 +180,23 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const pattern = parsed.description.toLowerCase().trim().slice(0, 120);
     if (pattern) {
       const existing = patterns.find((p) => p.pattern === pattern);
-      const payload = existing
-        ? { use_count: existing.use_count + 1, last_used_at: new Date().toISOString(), method: parsed.method, account_id: parsed.account_id, category: parsed.category }
-        : { profile_id: activeProfile.id, pattern, method: parsed.method, account_id: parsed.account_id, category: parsed.category, use_count: 1 };
       if (existing) {
-        await supabase.from("expense_patterns").update(payload).eq("id", existing.id);
+        await supabase.from("expense_patterns").update({
+          use_count: existing.use_count + 1,
+          last_used_at: new Date().toISOString(),
+          method: parsed.method,
+          account_id: parsed.account_id,
+          category: parsed.category,
+        }).eq("id", existing.id);
       } else {
-        await supabase.from("expense_patterns").insert(payload);
+        await supabase.from("expense_patterns").insert({
+          profile_id: activeProfile.id,
+          pattern,
+          method: parsed.method,
+          account_id: parsed.account_id,
+          category: parsed.category,
+          use_count: 1,
+        });
       }
     }
     return { expense: exp };
