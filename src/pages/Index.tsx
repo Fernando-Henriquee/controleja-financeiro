@@ -12,6 +12,7 @@ import { BehaviorAlerts } from "@/components/BehaviorAlerts";
 import { AutomationPanel } from "@/components/AutomationPanel";
 import { ReminderWatcher } from "@/components/ReminderWatcher";
 import { MonthSelector } from "@/components/MonthSelector";
+import { MonthCalendar } from "@/components/MonthCalendar";
 import Profiles from "./Profiles";
 import { ChevronDown, LogOut } from "lucide-react";
 import { useState } from "react";
@@ -83,6 +84,9 @@ const Index = () => {
             <DailyLimitCard />
             <BehaviorAlerts />
             <FastInput />
+            <Section title="Calendário do mês">
+              <MonthCalendar />
+            </Section>
             <Section title="Últimos gastos">
               <RecentExpenses />
             </Section>
