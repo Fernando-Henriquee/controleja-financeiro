@@ -107,7 +107,10 @@ export function AutomationPanel() {
       {/* Form */}
       {showForm && (
         <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-          <p className="mb-2 text-xs uppercase tracking-wider text-muted-foreground">Nova conta recorrente</p>
+          <p className="mb-1 text-xs uppercase tracking-wider text-muted-foreground">Nova conta recorrente</p>
+          <p className="mb-3 text-[11px] text-muted-foreground">
+            Cadastre apenas para não esquecer. <span className="font-semibold text-foreground">Na hora de pagar você escolhe</span> se foi débito, PIX, crédito (vai pra fatura) ou dinheiro.
+          </p>
 
           <div className="mb-2 flex flex-wrap gap-1">
             {SUGGESTIONS.map((s) => (
