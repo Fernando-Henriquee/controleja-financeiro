@@ -22,6 +22,7 @@ export type Database = {
           credit_limit: number | null
           credit_used: number
           id: string
+          kind: string
           name: string
           position: number
           profile_id: string
@@ -33,6 +34,7 @@ export type Database = {
           credit_limit?: number | null
           credit_used?: number
           id?: string
+          kind?: string
           name: string
           position?: number
           profile_id: string
@@ -44,6 +46,7 @@ export type Database = {
           credit_limit?: number | null
           credit_used?: number
           id?: string
+          kind?: string
           name?: string
           position?: number
           profile_id?: string
@@ -249,6 +252,53 @@ export type Database = {
             foreignKeyName: "income_settings_profile_id_fkey"
             columns: ["profile_id"]
             isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      loans: {
+        Row: {
+          bank: string
+          created_at: string
+          id: string
+          installment_amount: number
+          notes: string | null
+          paid_installments: number
+          payment_day: number
+          profile_id: string
+          total_amount: number
+          total_installments: number
+        }
+        Insert: {
+          bank: string
+          created_at?: string
+          id?: string
+          installment_amount?: number
+          notes?: string | null
+          paid_installments?: number
+          payment_day?: number
+          profile_id: string
+          total_amount?: number
+          total_installments?: number
+        }
+        Update: {
+          bank?: string
+          created_at?: string
+          id?: string
+          installment_amount?: number
+          notes?: string | null
+          paid_installments?: number
+          payment_day?: number
+          profile_id?: string
+          total_amount?: number
+          total_installments?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "loans_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },

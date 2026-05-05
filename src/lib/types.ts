@@ -7,6 +7,8 @@ export type Profile = {
   color: string;
 };
 
+export type AccountKind = "debit" | "credit";
+
 export type Account = {
   id: string;
   name: string;
@@ -15,6 +17,19 @@ export type Account = {
   credit_limit: number | null;
   credit_used: number;
   position: number;
+  kind: AccountKind;
+};
+
+export type Loan = {
+  id: string;
+  profile_id: string;
+  bank: string;
+  total_amount: number;
+  installment_amount: number;
+  total_installments: number;
+  paid_installments: number;
+  payment_day: number;
+  notes: string | null;
 };
 
 export type Expense = {
