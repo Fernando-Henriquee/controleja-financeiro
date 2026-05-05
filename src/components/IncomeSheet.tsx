@@ -1,12 +1,14 @@
 import { ReactNode, useEffect, useState } from "react";
 import { useStore } from "@/lib/store";
-import { businessDaysInMonth, expectedMonthlyIncome, fmtBRL, monthLabel } from "@/lib/finance";
+import { businessDaysInMonthKey, expectedMonthlyIncome, fmtBRL, monthLabel } from "@/lib/finance";
 import { Settings2, X } from "lucide-react";
 
 export function IncomeSheet() {
   const { income, updateIncome, selectedMonth } = useStore();
   const [open, setOpen] = useState(false);
-  const expected = expectedMonthlyIncome(income);
+  const autoDays = businessDaysInMonthKey(selectedMonth);
+  const effectiveIncome = income.mode === "pj" ? { ...income, working_days: autoDays } : income;
+  const expected = expectedMonthlyIncome(effectiveIncome);
 
   return (
     <>
