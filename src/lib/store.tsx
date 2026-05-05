@@ -249,8 +249,55 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       credit_limit: creditLimit,
       credit_used: 0,
       position: nextPosition,
-    }).select().single();
+      kind: "credit",
+    } as any).select().single();
     if (data) setAccounts((prev) => [...prev, data as Account]);
+  }, [activeProfile, accounts]);
+
+  const addDebitAccount = useCallback(async (name: string, color: string, balance: number) => {
+    if (!activeProfile) return;
+    const nextPosition = accounts.length ? Math.max(...accounts.map((a) => Number(a.position))) + 1 : 0;
+    const { data } = await supabase.from("accounts").insert({
+      profile_id: activeProfile.id,
+      name,
+      color,
+      balance,
+      credit_limit: null,
+      credit_used: 0,
+      position: nextPosition,
+      kind: "debit",
+    } as any).select().single();
+    if (data) setAccounts((prev) => [...prev, data as Account]);
+  }, [activeProfile, accounts]);
+
+  const removeAccount = useCallback(async (id: string) => {
+    await supabase.from("accounts").delete().eq("id", id);
+    setAccounts((prev) => prev.filter((a) => a.id !== id));
+  }, []);
+
+  const addExpenseManual = useCallback(async (input: { amount: number; description: string; category?: string; method: PaymentMethod; account_id: string }) => {
+    if (!activeProfile) return { expense: null, error: "Selecione um perfil." };
+    if (!input.amount || input.amount <= 0) return { expense: null, error: "Valor inválido." };
+    const { data, error } = await supabase.from("expenses").insert({
+      profile_id: activeProfile.id,
+      account_id: input.account_id,
+      amount: input.amount,
+      description: input.description || "Gasto",
+      category: input.category || "Outros",
+      method: input.method,
+      raw: null,
+    }).select().single();
+    if (error || !data) return { expense: null, error: error?.message ?? "Falha ao salvar." };
+    const acc = accounts.find((a) => a.id === input.account_id);
+    if (acc) {
+      const patch = input.method === "credit"
+        ? { credit_used: Number(acc.credit_used) + input.amount }
+        : { balance: Number(acc.balance) - input.amount };
+      await supabase.from("accounts").update(patch).eq("id", acc.id);
+      setAccounts((prev) => prev.map((a) => a.id === acc.id ? { ...a, ...patch } : a));
+    }
+    setExpenses((prev) => [data as Expense, ...prev]);
+    return { expense: data as Expense };
   }, [activeProfile, accounts]);
 
   const updateIncome = useCallback(async (patch: Partial<Income>) => {
