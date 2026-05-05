@@ -15,6 +15,23 @@ export function MonthCalendar() {
     [selectedMonth, income, expenses],
   );
 
+  // Average daily spend so far (based on days that already had any activity / elapsed days of the month)
+  const { avgDaily, daysElapsed, daysLeft } = useMemo(() => {
+    const today = new Date();
+    const [y, m] = selectedMonth.split("-").map(Number);
+    const isCurrent = today.getFullYear() === y && today.getMonth() === m - 1;
+    const elapsed = isCurrent ? today.getDate() : real.monthDays.length;
+    const left = Math.max(0, real.monthDays.length - elapsed);
+    const avg = elapsed > 0 ? real.spentSoFar / elapsed : 0;
+    return { avgDaily: avg, daysElapsed: elapsed, daysLeft: left };
+  }, [selectedMonth, real]);
+
+  // Default projection: keep spending at current average pace
+  const paceProjection = useMemo(
+    () => buildMonthCalendar(selectedMonth, income, expenses, avgDaily > 0 ? avgDaily : undefined),
+    [selectedMonth, income, expenses, avgDaily],
+  );
+
   // Simulation: replace future projection with `simSpend` per day
   const sim = useMemo(
     () => buildMonthCalendar(selectedMonth, income, expenses, simSpend > 0 ? simSpend : undefined),
@@ -25,6 +42,9 @@ export function MonthCalendar() {
   const view = useSim ? sim : real;
 
   const monthName = monthLabel(selectedMonth);
+  const paceEnd = paceProjection.endBalance;
+  const limit = real.evenDailyLimit;
+  const overUnder = avgDaily - limit;
 
   return (
     <div className="rounded-3xl border border-border bg-card p-4 shadow-sm">
@@ -83,6 +103,31 @@ export function MonthCalendar() {
         <Legend color="bg-primary/5 border-primary/30 border-dashed" label="Projeção futura" />
         <Legend color="bg-rose-500/10 border-rose-500/50 border-dashed" label="Projeção no vermelho" />
       </div>
+
+      {daysElapsed > 0 && daysLeft > 0 && (
+        <div className={cn(
+          "mt-4 rounded-2xl border p-3 text-xs",
+          paceEnd < 0 ? "border-rose-500/40 bg-rose-500/5" : "border-emerald-500/40 bg-emerald-500/5",
+        )}>
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            No seu ritmo atual
+          </p>
+          <p className="mt-1 font-display text-sm">
+            Você está gastando em média{" "}
+            <span className="font-bold tabular-nums">{fmtBRL(avgDaily)}</span>/dia
+            {limit > 0 && (
+              <span className={cn("ml-1 text-[11px]", overUnder > 0 ? "text-rose-500" : "text-emerald-600")}>
+                ({overUnder > 0 ? "+" : ""}{fmtBRL(overUnder)} vs limite de {fmtBRL(limit)})
+              </span>
+            )}.
+          </p>
+          <p className={cn("mt-1 text-xs font-semibold", paceEnd < 0 ? "text-rose-500" : "text-emerald-600")}>
+            {paceEnd < 0
+              ? `Mantendo esse ritmo nos próximos ${daysLeft} dias, você terminaria o mês ${fmtBRL(Math.abs(paceEnd))} no vermelho.`
+              : `Mantendo esse ritmo nos próximos ${daysLeft} dias, você sobraria ${fmtBRL(paceEnd)} no fim do mês.`}
+          </p>
+        </div>
+      )}
 
       <div className="mt-4 rounded-2xl border border-dashed border-border bg-secondary/30 p-3">
         <label className="flex flex-col gap-2 text-xs">
