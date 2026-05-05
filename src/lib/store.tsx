@@ -33,8 +33,10 @@ type Ctx = {
   addDebitAccount: (name: string, color: string, balance: number) => Promise<void>;
   removeAccount: (id: string) => Promise<void>;
   updateIncome: (patch: Partial<Income>) => Promise<void>;
-  addRecurringRule: (rule: Omit<RecurringRule, "id" | "profile_id" | "applied_months">) => Promise<void>;
+  addRecurringRule: (rule: Omit<RecurringRule, "id" | "profile_id" | "applied_months" | "paid_months">) => Promise<void>;
   removeRecurringRule: (id: string) => Promise<void>;
+  markRecurringPaid: (ruleId: string, monthKey: string) => Promise<void>;
+  unmarkRecurringPaid: (ruleId: string, monthKey: string) => Promise<void>;
   addReminder: (reminder: Omit<Reminder, "id" | "profile_id">) => Promise<void>;
   removeReminder: (id: string) => Promise<void>;
   addLoan: (loan: Omit<Loan, "id" | "profile_id">) => Promise<void>;
@@ -324,7 +326,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (!activeProfile || !recurringRules.length) return;
     const now = new Date();
     const key = monthKey(now);
-    const due = recurringRules.filter((r) => r.day_of_month <= now.getDate() && !r.applied_months.includes(key));
+    const due = recurringRules.filter((r) => r.auto_apply && r.day_of_month <= now.getDate() && !r.applied_months.includes(key));
     if (!due.length) return;
 
     (async () => {
@@ -349,17 +351,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           setAccounts((prev) => prev.map((a) => a.id === acc.id ? { ...a, ...patch } : a));
         }
         setExpenses((prev) => [data as Expense, ...prev]);
-        setRecurringRules((prev) => prev.map((r) => r.id === rule.id ? { ...r, applied_months: [...r.applied_months, key] } : r));
+        const nextApplied = [...rule.applied_months, key];
+        const nextPaid = rule.paid_months.includes(key) ? rule.paid_months : [...rule.paid_months, key];
+        await supabase.from("recurring_rules").update({ applied_months: nextApplied, paid_months: nextPaid }).eq("id", rule.id);
+        setRecurringRules((prev) => prev.map((r) => r.id === rule.id ? { ...r, applied_months: nextApplied, paid_months: nextPaid } : r));
       }
     })();
   }, [activeProfile, recurringRules, accounts]);
 
-  const addRecurringRule = useCallback(async (rule: Omit<RecurringRule, "id" | "profile_id" | "applied_months">) => {
+  const addRecurringRule = useCallback(async (rule: Omit<RecurringRule, "id" | "profile_id" | "applied_months" | "paid_months">) => {
     if (!activeProfile) return;
     const { data } = await supabase.from("recurring_rules").insert({
       profile_id: activeProfile.id,
       ...rule,
       applied_months: [],
+      paid_months: [],
     }).select().single();
     if (data) setRecurringRules((prev) => [data as RecurringRule, ...prev]);
   }, [activeProfile]);
@@ -368,6 +374,70 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     await supabase.from("recurring_rules").delete().eq("id", id);
     setRecurringRules((prev) => prev.filter((r) => r.id !== id));
   }, []);
+
+  const markRecurringPaid = useCallback(async (ruleId: string, mKey: string) => {
+    if (!activeProfile) return;
+    const rule = recurringRules.find((r) => r.id === ruleId);
+    if (!rule) return;
+    if (rule.paid_months.includes(mKey)) return;
+
+    // Create the expense, dated within the target month at the rule's payment day
+    const [yy, mm] = mKey.split("-").map(Number);
+    const lastDay = new Date(yy, mm, 0).getDate();
+    const day = Math.min(rule.day_of_month, lastDay);
+    const occurredAt = new Date(yy, mm - 1, day, 12, 0, 0).toISOString();
+
+    const { data } = await supabase.from("expenses").insert({
+      profile_id: activeProfile.id,
+      account_id: rule.account_id,
+      amount: rule.amount,
+      description: `[Recorrente] ${rule.description}`,
+      category: rule.category,
+      method: rule.method,
+      raw: `recorrente:${rule.id}:${mKey}`,
+      occurred_at: occurredAt,
+    }).select().single();
+    if (!data) return;
+
+    const acc = accounts.find((a) => a.id === rule.account_id);
+    if (acc) {
+      const patch = rule.method === "credit"
+        ? { credit_used: Number(acc.credit_used) + Number(rule.amount) }
+        : { balance: Number(acc.balance) - Number(rule.amount) };
+      await supabase.from("accounts").update(patch).eq("id", acc.id);
+      setAccounts((prev) => prev.map((a) => a.id === acc.id ? { ...a, ...patch } : a));
+    }
+    setExpenses((prev) => [data as Expense, ...prev]);
+
+    const nextPaid = [...rule.paid_months, mKey];
+    const nextApplied = rule.applied_months.includes(mKey) ? rule.applied_months : [...rule.applied_months, mKey];
+    await supabase.from("recurring_rules").update({ paid_months: nextPaid, applied_months: nextApplied }).eq("id", ruleId);
+    setRecurringRules((prev) => prev.map((r) => r.id === ruleId ? { ...r, paid_months: nextPaid, applied_months: nextApplied } : r));
+  }, [activeProfile, recurringRules, accounts]);
+
+  const unmarkRecurringPaid = useCallback(async (ruleId: string, mKey: string) => {
+    const rule = recurringRules.find((r) => r.id === ruleId);
+    if (!rule) return;
+    // Remove the expense tagged for this rule + month
+    const tag = `recurrente:${ruleId}:${mKey}`.replace("recurrente", "recorrente");
+    const { data: exps } = await supabase.from("expenses").select("*").eq("raw", tag);
+    for (const e of (exps ?? []) as Expense[]) {
+      await supabase.from("expenses").delete().eq("id", e.id);
+      const acc = accounts.find((a) => a.id === e.account_id);
+      if (acc) {
+        const patch = e.method === "credit"
+          ? { credit_used: Math.max(0, Number(acc.credit_used) - Number(e.amount)) }
+          : { balance: Number(acc.balance) + Number(e.amount) };
+        await supabase.from("accounts").update(patch).eq("id", acc.id);
+        setAccounts((prev) => prev.map((a) => a.id === acc.id ? { ...a, ...patch } : a));
+      }
+      setExpenses((prev) => prev.filter((x) => x.id !== e.id));
+    }
+    const nextPaid = rule.paid_months.filter((m) => m !== mKey);
+    const nextApplied = rule.applied_months.filter((m) => m !== mKey);
+    await supabase.from("recurring_rules").update({ paid_months: nextPaid, applied_months: nextApplied }).eq("id", ruleId);
+    setRecurringRules((prev) => prev.map((r) => r.id === ruleId ? { ...r, paid_months: nextPaid, applied_months: nextApplied } : r));
+  }, [recurringRules, accounts]);
 
   const addReminder = useCallback(async (reminder: Omit<Reminder, "id" | "profile_id">) => {
     if (!activeProfile) return;
