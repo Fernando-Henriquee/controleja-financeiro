@@ -83,6 +83,7 @@ const Index = () => {
               </div>
             )}
           </div>
+          </div>
         </header>
         <MonthSelector />
 
