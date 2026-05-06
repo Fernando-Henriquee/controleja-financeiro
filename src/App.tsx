@@ -8,6 +8,7 @@ import { StoreProvider } from "@/lib/store";
 import Index from "./pages/Index.tsx";
 import Auth from "./pages/Auth.tsx";
 import Cards from "./pages/Cards.tsx";
+import Dashboard from "./pages/Dashboard.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -24,6 +25,7 @@ const App = () => (
               <Route path="/" element={<Index />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/cards" element={<Cards />} />
+              <Route path="/dashboard" element={<Dashboard />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </StoreProvider>
