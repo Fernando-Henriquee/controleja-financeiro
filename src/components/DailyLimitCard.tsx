@@ -15,17 +15,17 @@ import {
 import { cn } from "@/lib/utils";
 
 export function DailyLimitCard() {
-  const { income, expenses, selectedMonth, loans, installmentPlans } = useStore();
+  const { income, expenses, selectedMonth, loans, installmentPlans, accounts, recurringRules } = useStore();
   const isCurrentMonth = selectedMonth === monthKey();
 
   const classicLimit = dailyLimit(income, expenses);
-  const realisticLimit = dailyLimitRealistic(income, expenses, loans, installmentPlans, selectedMonth);
+  const realisticLimit = dailyLimitRealistic(income, expenses, loans, installmentPlans, selectedMonth, accounts, recurringRules);
   const limit = isCurrentMonth ? realisticLimit : classicLimit;
 
   const spent = todaySpent(expenses);
 
   const status = isCurrentMonth
-    ? dailyStatusRealistic(income, expenses, loans, installmentPlans, selectedMonth)
+    ? dailyStatusRealistic(income, expenses, loans, installmentPlans, selectedMonth, accounts, recurringRules)
     : dailyStatus(income, expenses);
 
   const remaining = Math.max(0, limit - spent);
@@ -34,7 +34,7 @@ export function DailyLimitCard() {
   const deviation = dailyDeviationFromIdeal(income, expenses);
   const direction = deviation > 0 ? "+" : "-";
 
-  const sobraMes = remainingAfterObligations(income, expenses, loans, installmentPlans, selectedMonth);
+  const sobraMes = remainingAfterObligations(income, expenses, loans, installmentPlans, selectedMonth, accounts, recurringRules);
 
   const grad = status === "safe" ? "bg-gradient-safe" : status === "warn" ? "bg-gradient-warn" : "bg-gradient-danger";
   const message = !isCurrentMonth
