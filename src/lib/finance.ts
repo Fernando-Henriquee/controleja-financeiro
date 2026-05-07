@@ -171,6 +171,48 @@ export function totalUnpaidRecurringInMonth(rules: RecurringRule[], monthKeyStr:
     .reduce((s, r) => s + Number(r.amount), 0);
 }
 
+export type ObligationOpts = {
+  skippedAccountIds?: string[];
+  skippedRecurringIds?: string[];
+  savingsGoal?: number;
+};
+
+export type ObligationBreakdown = {
+  renda: number;
+  gasto: number;
+  emprestimos: number;
+  parcelas: number;
+  faturas: number;
+  recorrentes: number;
+  poupanca: number;
+  sobra: number;
+};
+
+export function obligationBreakdown(
+  income: Income,
+  expenses: Expense[],
+  loans: Loan[],
+  installmentPlans: InstallmentPlan[],
+  obligationMonthKey: string,
+  accounts: Account[] = [],
+  recurringRules: RecurringRule[] = [],
+  opts: ObligationOpts = {},
+): ObligationBreakdown {
+  const renda = expectedMonthlyIncome(income);
+  const gasto = monthSpent(expenses);
+  const emprestimos = totalLoanInstallmentsDueInMonth(loans);
+  const parcelas = totalInstallmentsDueInMonth(installmentPlans, obligationMonthKey);
+  const skipAcc = new Set(opts.skippedAccountIds ?? []);
+  const skipRec = new Set(opts.skippedRecurringIds ?? []);
+  const faturas = accounts.filter(a => !skipAcc.has(a.id)).reduce((s, a) => s + Number(a.credit_used ?? 0), 0);
+  const recorrentes = recurringRules
+    .filter(r => !r.paid_months.includes(obligationMonthKey) && !skipRec.has(r.id))
+    .reduce((s, r) => s + Number(r.amount), 0);
+  const poupanca = Math.max(0, opts.savingsGoal ?? 0);
+  const sobra = renda - gasto - emprestimos - parcelas - faturas - recorrentes - poupanca;
+  return { renda, gasto, emprestimos, parcelas, faturas, recorrentes, poupanca, sobra };
+}
+
 export function remainingAfterObligations(
   income: Income,
   expenses: Expense[],
@@ -179,14 +221,9 @@ export function remainingAfterObligations(
   obligationMonthKey: string,
   accounts: Account[] = [],
   recurringRules: RecurringRule[] = [],
+  opts: ObligationOpts = {},
 ): number {
-  const renda = expectedMonthlyIncome(income);
-  const gasto = monthSpent(expenses);
-  const emprestimos = totalLoanInstallmentsDueInMonth(loans);
-  const parcelas = totalInstallmentsDueInMonth(installmentPlans, obligationMonthKey);
-  const faturas = totalCreditUsed(accounts);
-  const recorrentes = totalUnpaidRecurringInMonth(recurringRules, obligationMonthKey);
-  return renda - gasto - emprestimos - parcelas - faturas - recorrentes;
+  return obligationBreakdown(income, expenses, loans, installmentPlans, obligationMonthKey, accounts, recurringRules, opts).sobra;
 }
 
 export function dailyLimitRealistic(
@@ -197,8 +234,9 @@ export function dailyLimitRealistic(
   obligationMonthKey: string,
   accounts: Account[] = [],
   recurringRules: RecurringRule[] = [],
+  opts: ObligationOpts = {},
 ): number {
-  const sobra = remainingAfterObligations(income, expenses, loans, installmentPlans, obligationMonthKey, accounts, recurringRules);
+  const sobra = remainingAfterObligations(income, expenses, loans, installmentPlans, obligationMonthKey, accounts, recurringRules, opts);
   const days = Math.max(1, daysRemaining());
   return Math.max(0, sobra / days);
 }
