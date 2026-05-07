@@ -26,8 +26,13 @@ export type ParsedExpense = {
   raw: string;
 };
 
+function norm(s: string): string {
+  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
 export function parseExpense(input: string, accounts: Account[]): ParsedExpense | null {
-  const text = input.trim().toLowerCase();
+  const raw = input.trim();
+  const text = norm(raw);
   if (!text || !accounts.length) return null;
   const amountMatch = text.match(/(\d+[.,]?\d*)/);
   if (!amountMatch) return null;
@@ -36,40 +41,40 @@ export function parseExpense(input: string, accounts: Account[]): ParsedExpense 
 
   let method: PaymentMethod = "debit";
   for (const [m, kws] of Object.entries(METHOD_KEYWORDS)) {
-    if (kws.some(k => text.includes(k))) { method = m as PaymentMethod; break; }
+    if (kws.some(k => text.includes(norm(k)))) { method = m as PaymentMethod; break; }
   }
 
   let account_id = accounts[0].id;
+  let bestLen = 0;
   for (const a of accounts) {
-    const first = a.name.toLowerCase().split(" ")[0];
-    if (text.includes(a.name.toLowerCase().replace(/\s+/g, "")) || text.includes(first)) {
-      account_id = a.id;
-      break;
-    }
+    const full = norm(a.name).replace(/\s+/g, "");
+    const first = norm(a.name).split(" ")[0];
+    if (full && text.includes(full) && full.length > bestLen) { account_id = a.id; bestLen = full.length; }
+    else if (first && text.includes(first) && first.length > bestLen) { account_id = a.id; bestLen = first.length; }
   }
 
   let category = "Outros";
   for (const [cat, kws] of Object.entries(CATEGORY_KEYWORDS)) {
-    if (kws.some(k => text.includes(k))) { category = cat; break; }
+    if (kws.some(k => text.includes(norm(k)))) { category = cat; break; }
   }
 
-  const description = input.replace(amountMatch[0], "").trim() || category;
-  return { amount, description, category, method, account_id, raw: input };
+  const description = raw.replace(amountMatch[0], "").trim() || category;
+  return { amount, description, category, method, account_id, raw };
 }
 
 export function parseExpenseWithHistory(input: string, accounts: Account[], expenses: Expense[]): ParsedExpense | null {
   const parsed = parseExpense(input, accounts);
   if (!parsed) return null;
-  const text = input.trim().toLowerCase();
-  const hasMethod = /(credito|crédito|credit|cartão|cartao|cc|debito|débito|debit|pix|dinheiro|cash|espécie|especie)/.test(text);
+  const text = norm(input);
+  const hasMethod = /(credito|credit|cartao|cc|debito|debit|pix|dinheiro|cash|especie)/.test(text);
   const hasAccount = accounts.some((a) => {
-    const n = a.name.toLowerCase();
+    const n = norm(a.name);
     return text.includes(n) || text.includes(n.split(" ")[0]);
   });
   if (hasMethod && hasAccount) return parsed;
 
-  const needle = parsed.description.toLowerCase().replace(/\s+/g, " ").trim();
-  const match = expenses.find((e) => e.description.toLowerCase().includes(needle));
+  const needle = norm(parsed.description).replace(/\s+/g, " ").trim();
+  const match = expenses.find((e) => norm(e.description).includes(needle));
   if (!match) return parsed;
 
   return {
@@ -166,6 +171,48 @@ export function totalUnpaidRecurringInMonth(rules: RecurringRule[], monthKeyStr:
     .reduce((s, r) => s + Number(r.amount), 0);
 }
 
+export type ObligationOpts = {
+  skippedAccountIds?: string[];
+  skippedRecurringIds?: string[];
+  savingsGoal?: number;
+};
+
+export type ObligationBreakdown = {
+  renda: number;
+  gasto: number;
+  emprestimos: number;
+  parcelas: number;
+  faturas: number;
+  recorrentes: number;
+  poupanca: number;
+  sobra: number;
+};
+
+export function obligationBreakdown(
+  income: Income,
+  expenses: Expense[],
+  loans: Loan[],
+  installmentPlans: InstallmentPlan[],
+  obligationMonthKey: string,
+  accounts: Account[] = [],
+  recurringRules: RecurringRule[] = [],
+  opts: ObligationOpts = {},
+): ObligationBreakdown {
+  const renda = expectedMonthlyIncome(income);
+  const gasto = monthSpent(expenses);
+  const emprestimos = totalLoanInstallmentsDueInMonth(loans);
+  const parcelas = totalInstallmentsDueInMonth(installmentPlans, obligationMonthKey);
+  const skipAcc = new Set(opts.skippedAccountIds ?? []);
+  const skipRec = new Set(opts.skippedRecurringIds ?? []);
+  const faturas = accounts.filter(a => !skipAcc.has(a.id)).reduce((s, a) => s + Number(a.credit_used ?? 0), 0);
+  const recorrentes = recurringRules
+    .filter(r => !r.paid_months.includes(obligationMonthKey) && !skipRec.has(r.id))
+    .reduce((s, r) => s + Number(r.amount), 0);
+  const poupanca = Math.max(0, opts.savingsGoal ?? 0);
+  const sobra = renda - gasto - emprestimos - parcelas - faturas - recorrentes - poupanca;
+  return { renda, gasto, emprestimos, parcelas, faturas, recorrentes, poupanca, sobra };
+}
+
 export function remainingAfterObligations(
   income: Income,
   expenses: Expense[],
@@ -174,14 +221,9 @@ export function remainingAfterObligations(
   obligationMonthKey: string,
   accounts: Account[] = [],
   recurringRules: RecurringRule[] = [],
+  opts: ObligationOpts = {},
 ): number {
-  const renda = expectedMonthlyIncome(income);
-  const gasto = monthSpent(expenses);
-  const emprestimos = totalLoanInstallmentsDueInMonth(loans);
-  const parcelas = totalInstallmentsDueInMonth(installmentPlans, obligationMonthKey);
-  const faturas = totalCreditUsed(accounts);
-  const recorrentes = totalUnpaidRecurringInMonth(recurringRules, obligationMonthKey);
-  return renda - gasto - emprestimos - parcelas - faturas - recorrentes;
+  return obligationBreakdown(income, expenses, loans, installmentPlans, obligationMonthKey, accounts, recurringRules, opts).sobra;
 }
 
 export function dailyLimitRealistic(
@@ -192,8 +234,9 @@ export function dailyLimitRealistic(
   obligationMonthKey: string,
   accounts: Account[] = [],
   recurringRules: RecurringRule[] = [],
+  opts: ObligationOpts = {},
 ): number {
-  const sobra = remainingAfterObligations(income, expenses, loans, installmentPlans, obligationMonthKey, accounts, recurringRules);
+  const sobra = remainingAfterObligations(income, expenses, loans, installmentPlans, obligationMonthKey, accounts, recurringRules, opts);
   const days = Math.max(1, daysRemaining());
   return Math.max(0, sobra / days);
 }
@@ -222,10 +265,11 @@ export function dailyStatusRealistic(
   obligationMonthKey: string,
   accounts: Account[] = [],
   recurringRules: RecurringRule[] = [],
+  opts: ObligationOpts = {},
 ): Status {
-  const sobra = remainingAfterObligations(income, expenses, loans, plans, obligationMonthKey, accounts, recurringRules);
+  const sobra = remainingAfterObligations(income, expenses, loans, plans, obligationMonthKey, accounts, recurringRules, opts);
   if (sobra <= 0) return "danger";
-  const limit = dailyLimitRealistic(income, expenses, loans, plans, obligationMonthKey, accounts, recurringRules);
+  const limit = dailyLimitRealistic(income, expenses, loans, plans, obligationMonthKey, accounts, recurringRules, opts);
   const spent = todaySpent(expenses);
   if (limit <= 0 || spent > limit) return "danger";
   if (spent > limit * 0.75) return "warn";
