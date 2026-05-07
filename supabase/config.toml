@@ -1,1 +1,4 @@
 project_id = "ktpkirzjnvvrjalvjzqf"
+
+[functions.finance-coach]
+verify_jwt = false
