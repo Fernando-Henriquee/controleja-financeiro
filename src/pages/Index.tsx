@@ -9,6 +9,7 @@ import { RecentExpenses } from "@/components/RecentExpenses";
 import { IncomeSheet } from "@/components/IncomeSheet";
 import { BankInvoices } from "@/components/BankInvoices";
 import { BehaviorAlerts } from "@/components/BehaviorAlerts";
+import { FinanceCoach } from "@/components/FinanceCoach";
 import { AutomationPanel } from "@/components/AutomationPanel";
 import { ReminderWatcher } from "@/components/ReminderWatcher";
 import { MonthSelector } from "@/components/MonthSelector";
@@ -91,6 +92,7 @@ const Index = () => {
           <div className="space-y-5 lg:col-span-7">
             <DailyLimitCard />
             <BehaviorAlerts />
+            <FinanceCoach />
             <FastInput />
             <Section title="Calendário do mês">
               <MonthCalendar />
