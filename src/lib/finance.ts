@@ -1,4 +1,4 @@
-import type { Account, Expense, Income, InstallmentPlan, Loan, PaymentMethod } from "./types";
+import type { Account, Expense, Income, InstallmentPlan, Loan, PaymentMethod, RecurringRule } from "./types";
 
 export const CATEGORY_KEYWORDS: Record<string, string[]> = {
   Alimentação: ["almoço","almoco","jantar","café","cafe","lanche","comida","ifood","rappi","restaurante","padaria","mercado","supermercado"],
