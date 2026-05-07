@@ -220,10 +220,12 @@ export function dailyStatusRealistic(
   loans: Loan[],
   plans: InstallmentPlan[],
   obligationMonthKey: string,
+  accounts: Account[] = [],
+  recurringRules: RecurringRule[] = [],
 ): Status {
-  const sobra = remainingAfterObligations(income, expenses, loans, plans, obligationMonthKey);
+  const sobra = remainingAfterObligations(income, expenses, loans, plans, obligationMonthKey, accounts, recurringRules);
   if (sobra <= 0) return "danger";
-  const limit = dailyLimitRealistic(income, expenses, loans, plans, obligationMonthKey);
+  const limit = dailyLimitRealistic(income, expenses, loans, plans, obligationMonthKey, accounts, recurringRules);
   const spent = todaySpent(expenses);
   if (limit <= 0 || spent > limit) return "danger";
   if (spent > limit * 0.75) return "warn";
