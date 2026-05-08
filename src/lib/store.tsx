@@ -151,6 +151,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         worked_hours: ir.data.worked_hours != null ? Number(ir.data.worked_hours) : null,
         extra_income: Number(ir.data.extra_income ?? 0),
         deposit_account_id: (ir.data as any).deposit_account_id ?? null,
+        paid_at: (ir.data as any).paid_at ?? null,
       });
     } else if (i.data) {
       setIncome({
@@ -161,6 +162,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         worked_hours: null,
         extra_income: Number(i.data.extra_income ?? 0),
         deposit_account_id: null,
+        paid_at: null,
       });
     } else {
       setIncome(DEFAULT_INCOME);
