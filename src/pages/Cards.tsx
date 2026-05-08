@@ -380,7 +380,16 @@ function CreditRow({ account }: { account: Account }) {
   useEffect(() => {
     setDraftLimit(Number(account.credit_limit ?? 0));
     setDraftTotal(Number(account.credit_used));
-  }, [account.id, account.credit_limit, account.credit_used]);
+    setDraftName(account.name);
+    setDraftColor(account.color);
+  }, [account.id, account.credit_limit, account.credit_used, account.name, account.color]);
+
+  async function saveMeta() {
+    if (!draftName.trim()) { toast.error("Nome obrigatório."); return; }
+    await updateAccount(account.id, { name: draftName.trim(), color: draftColor });
+    setEditingMeta(false);
+    toast.success("Cartão atualizado.");
+  }
 
   const used = Number(account.credit_used);
   const limit = Number(account.credit_limit ?? 0);
