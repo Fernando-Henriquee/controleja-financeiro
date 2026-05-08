@@ -44,13 +44,21 @@ export function parseExpense(input: string, accounts: Account[]): ParsedExpense 
     if (kws.some(k => text.includes(norm(k)))) { method = m as PaymentMethod; break; }
   }
 
-  let account_id = accounts[0].id;
-  let bestLen = 0;
+  const wantsCredit = method === "credit";
+  const kindMatch = (a: Account) => wantsCredit ? a.kind === "credit" : a.kind === "debit";
+  // Default: first account that matches the requested kind, fallback to first overall
+  let account_id = (accounts.find(kindMatch) ?? accounts[0]).id;
+  let bestScore = 0;
   for (const a of accounts) {
     const full = norm(a.name).replace(/\s+/g, "");
     const first = norm(a.name).split(" ")[0];
-    if (full && text.includes(full) && full.length > bestLen) { account_id = a.id; bestLen = full.length; }
-    else if (first && text.includes(first) && first.length > bestLen) { account_id = a.id; bestLen = first.length; }
+    let nameLen = 0;
+    if (full && text.includes(full)) nameLen = full.length;
+    else if (first && text.includes(first)) nameLen = first.length;
+    if (nameLen <= 0) continue;
+    // Heavy bonus when kind matches the chosen payment method
+    const score = nameLen + (kindMatch(a) ? 1000 : 0);
+    if (score > bestScore) { account_id = a.id; bestScore = score; }
   }
 
   let category = "Outros";
