@@ -131,7 +131,7 @@ export function effectiveAccountBalance(account: Account, _income: Income): numb
   return Number(account.balance);
 }
 export function totalEffectiveBalance(accounts: Account[], _income?: Income): number {
-  return accounts.reduce((a, x) => a + Number(x.balance), 0);
+  return accounts.filter((x) => x.kind === "debit").reduce((a, x) => a + Number(x.balance), 0);
 }
 export function totalCreditUsed(accounts: Account[]): number {
   return accounts.reduce((a, x) => a + Number(x.credit_used ?? 0), 0);
