@@ -3,6 +3,8 @@ import { useStore } from "@/lib/store";
 import { buildMonthCalendar, fmtBRL, monthLabel, type DayCell } from "@/lib/finance";
 import { cn } from "@/lib/utils";
 import { ChevronDown, ChevronUp } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ExpenseForm } from "@/components/ExpenseForm";
 
 const WEEKDAYS = ["D", "S", "T", "Q", "Q", "S", "S"];
 
