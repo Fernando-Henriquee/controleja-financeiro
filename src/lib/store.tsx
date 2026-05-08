@@ -146,7 +146,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         monthly_salary: Number(ir.data.monthly_salary ?? 0),
         hourly_rate: Number(ir.data.hourly_rate ?? 0),
         working_days: Number(ir.data.working_days ?? 0),
+        worked_hours: ir.data.worked_hours != null ? Number(ir.data.worked_hours) : null,
         extra_income: Number(ir.data.extra_income ?? 0),
+        deposit_account_id: (ir.data as any).deposit_account_id ?? null,
       });
     } else if (i.data) {
       setIncome({
@@ -154,7 +156,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         monthly_salary: Number(i.data.monthly_salary ?? 0),
         hourly_rate: Number(i.data.hourly_rate ?? 0),
         working_days: Number(i.data.working_days ?? 0),
+        worked_hours: null,
         extra_income: Number(i.data.extra_income ?? 0),
+        deposit_account_id: null,
       });
     } else {
       setIncome(DEFAULT_INCOME);
