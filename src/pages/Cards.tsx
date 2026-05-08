@@ -448,10 +448,16 @@ function CreditRow({ account }: { account: Account }) {
             <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Cartão de crédito</p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <p className={`font-display text-sm font-semibold ${pct > 80 ? "text-status-danger" : pct > 50 ? "text-status-warn" : "text-status-safe"}`}>
             {Math.round(pct)}%
           </p>
+          <button
+            onClick={() => setEditingMeta((v) => !v)}
+            className="rounded-lg border border-border px-2 py-1 text-[11px] hover:border-primary"
+          >
+            {editingMeta ? "Fechar" : "Editar"}
+          </button>
           <ConfirmButton
             onConfirm={() => removeAccount(account.id)}
             title={`Remover ${account.name}?`}
@@ -463,6 +469,26 @@ function CreditRow({ account }: { account: Account }) {
           </ConfirmButton>
         </div>
       </div>
+
+      {editingMeta && (
+        <div className="mt-3 grid gap-2 border-t border-border pt-3 sm:grid-cols-[1fr_auto_auto]">
+          <input
+            value={draftName}
+            onChange={(e) => setDraftName(e.target.value)}
+            placeholder="Nome do banco"
+            className="rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+          />
+          <input
+            type="color"
+            value={draftColor}
+            onChange={(e) => setDraftColor(e.target.value)}
+            className="h-10 w-12 rounded-xl border border-border bg-background p-1"
+          />
+          <button onClick={saveMeta} className="rounded-xl bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground">
+            Salvar
+          </button>
+        </div>
+      )}
 
       <div className="mt-3 flex items-center justify-between text-xs">
         <span className="text-muted-foreground">Fatura aberta</span>
