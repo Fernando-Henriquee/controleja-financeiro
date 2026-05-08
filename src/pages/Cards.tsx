@@ -829,7 +829,12 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 function LoanRow({ loan }: { loan: Loan }) {
-  const { updateLoan, removeLoan } = useStore();
+  const { updateLoan, removeLoan, accounts } = useStore();
+  const debits = accounts.filter((a) => a.kind === "debit");
+  const [payAccountId, setPayAccountId] = useState<string>(debits[0]?.id ?? "");
+  useEffect(() => {
+    if (!payAccountId && debits[0]) setPayAccountId(debits[0].id);
+  }, [debits, payAccountId]);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState({
     bank: loan.bank,
@@ -858,7 +863,8 @@ function LoanRow({ loan }: { loan: Loan }) {
 
   async function pay() {
     if (loan.paid_installments >= loan.total_installments) return;
-    await updateLoan(loan.id, { paid_installments: loan.paid_installments + 1 });
+    if (!payAccountId) { toast.error("Cadastre uma conta de débito para pagar."); return; }
+    await updateLoan(loan.id, { paid_installments: loan.paid_installments + 1 }, { paymentAccountId: payAccountId });
     toast.success("Parcela registrada como paga.");
   }
   async function unpay() {
