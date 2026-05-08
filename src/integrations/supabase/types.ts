@@ -24,6 +24,7 @@ export type Database = {
           id: string
           kind: string
           name: string
+          overdraft_limit: number | null
           position: number
           profile_id: string
         }
@@ -36,6 +37,7 @@ export type Database = {
           id?: string
           kind?: string
           name: string
+          overdraft_limit?: number | null
           position?: number
           profile_id: string
         }
@@ -48,6 +50,7 @@ export type Database = {
           id?: string
           kind?: string
           name?: string
+          overdraft_limit?: number | null
           position?: number
           profile_id?: string
         }
@@ -196,6 +199,7 @@ export type Database = {
       income_records: {
         Row: {
           created_at: string
+          deposit_account_id: string | null
           extra_income: number
           hourly_rate: number
           id: string
@@ -204,10 +208,12 @@ export type Database = {
           monthly_salary: number
           profile_id: string
           updated_at: string
+          worked_hours: number | null
           working_days: number
         }
         Insert: {
           created_at?: string
+          deposit_account_id?: string | null
           extra_income?: number
           hourly_rate?: number
           id?: string
@@ -216,10 +222,12 @@ export type Database = {
           monthly_salary?: number
           profile_id: string
           updated_at?: string
+          worked_hours?: number | null
           working_days?: number
         }
         Update: {
           created_at?: string
+          deposit_account_id?: string | null
           extra_income?: number
           hourly_rate?: number
           id?: string
@@ -228,6 +236,7 @@ export type Database = {
           monthly_salary?: number
           profile_id?: string
           updated_at?: string
+          worked_hours?: number | null
           working_days?: number
         }
         Relationships: [

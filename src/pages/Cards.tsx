@@ -97,6 +97,7 @@ function AddAccountForm() {
   const [name, setName] = useState("");
   const [limit, setLimit] = useState(0);
   const [balance, setBalance] = useState(0);
+  const [overdraft, setOverdraft] = useState(0);
   const [color, setColor] = useState("#3b82f6");
 
   function pickPreset(p: { name: string; color: string }) {
@@ -116,9 +117,14 @@ function AddAccountForm() {
       }
       await addCreditAccount(name.trim(), color, limit);
     } else {
-      await addDebitAccount(name.trim(), color, Math.max(0, Number.isFinite(balance) ? balance : 0));
+      await addDebitAccount(
+        name.trim(),
+        color,
+        Number.isFinite(balance) ? balance : 0,
+        overdraft > 0 ? overdraft : null,
+      );
     }
-    setName(""); setLimit(0); setBalance(0);
+    setName(""); setLimit(0); setBalance(0); setOverdraft(0);
     toast.success("Conta adicionada.");
   }
 
@@ -186,12 +192,59 @@ function AddAccountForm() {
           <Plus className="mr-1 h-3.5 w-3.5" /> Adicionar
         </button>
       </div>
+
+      {kind === "debit" && (
+        <label className="mt-2 block">
+          <span className="text-[11px] uppercase tracking-wider text-muted-foreground">Cheque especial (opcional)</span>
+          <MoneyInput
+            value={overdraft}
+            onChange={setOverdraft}
+            placeholder="Limite do cheque especial"
+            className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+          />
+        </label>
+      )}
     </div>
   );
 }
 
 function DebitRow({ account }: { account: Account }) {
-  const { removeAccount } = useStore();
+  const { removeAccount, updateAccount } = useStore();
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState({
+    name: account.name,
+    color: account.color,
+    balance: Number(account.balance),
+    overdraft_limit: Number(account.overdraft_limit ?? 0),
+  });
+
+  useEffect(() => {
+    setDraft({
+      name: account.name,
+      color: account.color,
+      balance: Number(account.balance),
+      overdraft_limit: Number(account.overdraft_limit ?? 0),
+    });
+  }, [account.id, account.name, account.color, account.balance, account.overdraft_limit]);
+
+  const overdraft = Number(account.overdraft_limit ?? 0);
+  const balance = Number(account.balance);
+  const usingOverdraft = overdraft > 0 && balance < 0;
+  const overdraftUsed = usingOverdraft ? Math.min(overdraft, Math.abs(balance)) : 0;
+  const overdraftPct = overdraft > 0 ? Math.min(100, (overdraftUsed / overdraft) * 100) : 0;
+
+  async function save() {
+    if (!draft.name.trim()) { toast.error("Nome obrigatório."); return; }
+    await updateAccount(account.id, {
+      name: draft.name.trim(),
+      color: draft.color,
+      balance: draft.balance,
+      overdraft_limit: draft.overdraft_limit > 0 ? draft.overdraft_limit : null,
+    });
+    setEditing(false);
+    toast.success("Conta atualizada.");
+  }
+
   return (
     <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
       <div className="flex items-center justify-between gap-3">
@@ -205,7 +258,13 @@ function DebitRow({ account }: { account: Account }) {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <p className="font-display text-base font-semibold tabular-nums">{fmtBRL(Number(account.balance))}</p>
+          <p className={`font-display text-base font-semibold tabular-nums ${balance < 0 ? "text-status-danger" : ""}`}>{fmtBRL(balance)}</p>
+          <button
+            onClick={() => setEditing((v) => !v)}
+            className="rounded-lg border border-border px-2 py-1 text-[11px] hover:border-primary"
+          >
+            {editing ? "Fechar" : "Editar"}
+          </button>
           <ConfirmButton
             onConfirm={() => removeAccount(account.id)}
             title={`Remover ${account.name}?`}
@@ -217,6 +276,69 @@ function DebitRow({ account }: { account: Account }) {
           </ConfirmButton>
         </div>
       </div>
+
+      {overdraft > 0 ? (
+        <div className="mt-3 border-t border-border pt-3">
+          <div className="flex items-center justify-between text-[11px]">
+            <span className="text-muted-foreground">Cheque especial</span>
+            <span className="tabular-nums">
+              {fmtBRL(overdraftUsed)} <span className="text-muted-foreground">/ {fmtBRL(overdraft)}</span>
+            </span>
+          </div>
+          <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-secondary">
+            <div
+              className="h-full rounded-full transition-all"
+              style={{
+                width: `${overdraftPct}%`,
+                background: overdraftPct > 85 ? "hsl(var(--status-danger))" : overdraftPct > 50 ? "hsl(var(--status-warn))" : "hsl(var(--status-safe))",
+              }}
+            />
+          </div>
+        </div>
+      ) : null}
+
+      {editing && (
+        <div className="mt-3 grid gap-2 border-t border-border pt-3 sm:grid-cols-2">
+          <label className="block">
+            <span className="text-[11px] uppercase tracking-wider text-muted-foreground">Nome do banco</span>
+            <input
+              value={draft.name}
+              onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+              className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+            />
+          </label>
+          <label className="block">
+            <span className="text-[11px] uppercase tracking-wider text-muted-foreground">Cor</span>
+            <input
+              type="color"
+              value={draft.color}
+              onChange={(e) => setDraft({ ...draft, color: e.target.value })}
+              className="mt-1 h-10 w-full rounded-xl border border-border bg-background p-1"
+            />
+          </label>
+          <label className="block">
+            <span className="text-[11px] uppercase tracking-wider text-muted-foreground">Saldo atual</span>
+            <MoneyInput
+              value={draft.balance}
+              onChange={(v) => setDraft({ ...draft, balance: v })}
+              className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+            />
+          </label>
+          <label className="block">
+            <span className="text-[11px] uppercase tracking-wider text-muted-foreground">Cheque especial</span>
+            <MoneyInput
+              value={draft.overdraft_limit}
+              onChange={(v) => setDraft({ ...draft, overdraft_limit: v })}
+              className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+            />
+          </label>
+          <div className="sm:col-span-2 flex justify-end">
+            <button onClick={save} className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground">
+              Salvar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -225,6 +347,7 @@ function CreditRow({ account }: { account: Account }) {
   const {
     updateAccountCreditLimit,
     updateAccountCreditUsed,
+    updateAccount,
     addExpenseManual,
     removeAccount,
     expenses,
@@ -237,6 +360,9 @@ function CreditRow({ account }: { account: Account }) {
   const plansForCard = installmentPlans.filter((p) => p.account_id === account.id);
   const [draftLimit, setDraftLimit] = useState(() => Number(account.credit_limit ?? 0));
   const [draftTotal, setDraftTotal] = useState(() => Number(account.credit_used));
+  const [editingMeta, setEditingMeta] = useState(false);
+  const [draftName, setDraftName] = useState(account.name);
+  const [draftColor, setDraftColor] = useState(account.color);
   const [exp, setExp] = useState({ amount: 0, description: "", category: "" });
   const [showExpense, setShowExpense] = useState(false);
   const [savingLimit, setSavingLimit] = useState(false);
@@ -254,7 +380,16 @@ function CreditRow({ account }: { account: Account }) {
   useEffect(() => {
     setDraftLimit(Number(account.credit_limit ?? 0));
     setDraftTotal(Number(account.credit_used));
-  }, [account.id, account.credit_limit, account.credit_used]);
+    setDraftName(account.name);
+    setDraftColor(account.color);
+  }, [account.id, account.credit_limit, account.credit_used, account.name, account.color]);
+
+  async function saveMeta() {
+    if (!draftName.trim()) { toast.error("Nome obrigatório."); return; }
+    await updateAccount(account.id, { name: draftName.trim(), color: draftColor });
+    setEditingMeta(false);
+    toast.success("Cartão atualizado.");
+  }
 
   const used = Number(account.credit_used);
   const limit = Number(account.credit_limit ?? 0);
@@ -313,10 +448,16 @@ function CreditRow({ account }: { account: Account }) {
             <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Cartão de crédito</p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <p className={`font-display text-sm font-semibold ${pct > 80 ? "text-status-danger" : pct > 50 ? "text-status-warn" : "text-status-safe"}`}>
             {Math.round(pct)}%
           </p>
+          <button
+            onClick={() => setEditingMeta((v) => !v)}
+            className="rounded-lg border border-border px-2 py-1 text-[11px] hover:border-primary"
+          >
+            {editingMeta ? "Fechar" : "Editar"}
+          </button>
           <ConfirmButton
             onConfirm={() => removeAccount(account.id)}
             title={`Remover ${account.name}?`}
@@ -328,6 +469,26 @@ function CreditRow({ account }: { account: Account }) {
           </ConfirmButton>
         </div>
       </div>
+
+      {editingMeta && (
+        <div className="mt-3 grid gap-2 border-t border-border pt-3 sm:grid-cols-[1fr_auto_auto]">
+          <input
+            value={draftName}
+            onChange={(e) => setDraftName(e.target.value)}
+            placeholder="Nome do banco"
+            className="rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+          />
+          <input
+            type="color"
+            value={draftColor}
+            onChange={(e) => setDraftColor(e.target.value)}
+            className="h-10 w-12 rounded-xl border border-border bg-background p-1"
+          />
+          <button onClick={saveMeta} className="rounded-xl bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground">
+            Salvar
+          </button>
+        </div>
+      )}
 
       <div className="mt-3 flex items-center justify-between text-xs">
         <span className="text-muted-foreground">Fatura aberta</span>
@@ -669,6 +830,28 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function LoanRow({ loan }: { loan: Loan }) {
   const { updateLoan, removeLoan } = useStore();
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState({
+    bank: loan.bank,
+    total_amount: Number(loan.total_amount),
+    installment_amount: Number(loan.installment_amount),
+    total_installments: loan.total_installments,
+    paid_installments: loan.paid_installments,
+    payment_day: loan.payment_day,
+    notes: loan.notes ?? "",
+  });
+  useEffect(() => {
+    setDraft({
+      bank: loan.bank,
+      total_amount: Number(loan.total_amount),
+      installment_amount: Number(loan.installment_amount),
+      total_installments: loan.total_installments,
+      paid_installments: loan.paid_installments,
+      payment_day: loan.payment_day,
+      notes: loan.notes ?? "",
+    });
+  }, [loan]);
+
   const remaining = Math.max(0, loan.total_installments - loan.paid_installments);
   const remainingValue = remaining * Number(loan.installment_amount);
   const pct = loan.total_installments > 0 ? Math.min(100, (loan.paid_installments / loan.total_installments) * 100) : 0;
@@ -678,10 +861,23 @@ function LoanRow({ loan }: { loan: Loan }) {
     await updateLoan(loan.id, { paid_installments: loan.paid_installments + 1 });
     toast.success("Parcela registrada como paga.");
   }
-
   async function unpay() {
     if (loan.paid_installments <= 0) return;
     await updateLoan(loan.id, { paid_installments: loan.paid_installments - 1 });
+  }
+  async function saveEdit() {
+    if (!draft.bank.trim()) { toast.error("Informe o banco."); return; }
+    await updateLoan(loan.id, {
+      bank: draft.bank.trim(),
+      total_amount: draft.total_amount,
+      installment_amount: draft.installment_amount,
+      total_installments: Math.max(1, Number(draft.total_installments) || 1),
+      paid_installments: Math.max(0, Number(draft.paid_installments) || 0),
+      payment_day: Math.min(31, Math.max(1, Number(draft.payment_day) || 1)),
+      notes: draft.notes.trim() || null,
+    });
+    setEditing(false);
+    toast.success("Empréstimo atualizado.");
   }
 
   return (
@@ -696,16 +892,52 @@ function LoanRow({ loan }: { loan: Loan }) {
             <p className="text-[11px] text-muted-foreground">Pagamento todo dia {loan.payment_day}</p>
           </div>
         </div>
-        <ConfirmButton
-          onConfirm={() => removeLoan(loan.id)}
-          title={`Remover empréstimo ${loan.bank}?`}
-          description="Esta ação não pode ser desfeita."
-          className="text-muted-foreground hover:text-status-danger"
-          ariaLabel="Remover"
-        >
-          <Trash2 className="h-4 w-4" />
-        </ConfirmButton>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setEditing((v) => !v)} className="rounded-lg border border-border px-2 py-1 text-[11px] hover:border-primary">
+            {editing ? "Fechar" : "Editar"}
+          </button>
+          <ConfirmButton
+            onConfirm={() => removeLoan(loan.id)}
+            title={`Remover empréstimo ${loan.bank}?`}
+            description="Esta ação não pode ser desfeita."
+            className="text-muted-foreground hover:text-status-danger"
+            ariaLabel="Remover"
+          >
+            <Trash2 className="h-4 w-4" />
+          </ConfirmButton>
+        </div>
       </div>
+
+      {editing ? (
+        <div className="mt-3 grid gap-2 border-t border-border pt-3 sm:grid-cols-2">
+          <Field label="Banco">
+            <input value={draft.bank} onChange={(e) => setDraft({ ...draft, bank: e.target.value })} className="loan-input" />
+          </Field>
+          <Field label="Dia de pagamento">
+            <input type="number" min="1" max="31" value={draft.payment_day} onChange={(e) => setDraft({ ...draft, payment_day: Number(e.target.value) })} className="loan-input" />
+          </Field>
+          <Field label="Valor total">
+            <MoneyInput value={draft.total_amount} onChange={(v) => setDraft({ ...draft, total_amount: v })} className="loan-input" />
+          </Field>
+          <Field label="Valor da parcela">
+            <MoneyInput value={draft.installment_amount} onChange={(v) => setDraft({ ...draft, installment_amount: v })} className="loan-input" />
+          </Field>
+          <Field label="Total de parcelas">
+            <input type="number" min="1" value={draft.total_installments} onChange={(e) => setDraft({ ...draft, total_installments: Number(e.target.value) })} className="loan-input" />
+          </Field>
+          <Field label="Parcelas pagas">
+            <input type="number" min="0" value={draft.paid_installments} onChange={(e) => setDraft({ ...draft, paid_installments: Number(e.target.value) })} className="loan-input" />
+          </Field>
+          <div className="sm:col-span-2">
+            <Field label="Observações">
+              <textarea value={draft.notes} onChange={(e) => setDraft({ ...draft, notes: e.target.value })} rows={2} className="loan-input resize-none" />
+            </Field>
+          </div>
+          <div className="sm:col-span-2 flex justify-end">
+            <button onClick={saveEdit} className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground">Salvar</button>
+          </div>
+        </div>
+      ) : null}
 
       <div className="mt-3 grid grid-cols-3 gap-2 text-center">
         <Stat label="Total" value={fmtBRL(Number(loan.total_amount))} />
@@ -721,7 +953,7 @@ function LoanRow({ loan }: { loan: Loan }) {
         <div className="h-full rounded-full bg-status-safe transition-all" style={{ width: `${pct}%` }} />
       </div>
 
-      {loan.notes ? <p className="mt-2 text-[11px] text-muted-foreground">{loan.notes}</p> : null}
+      {loan.notes && !editing ? <p className="mt-2 text-[11px] text-muted-foreground">{loan.notes}</p> : null}
 
       <div className="mt-3 flex gap-2">
         <button onClick={pay} disabled={loan.paid_installments >= loan.total_installments} className="flex-1 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-60">
@@ -731,6 +963,7 @@ function LoanRow({ loan }: { loan: Loan }) {
           Desfazer
         </button>
       </div>
+      <style>{`.loan-input { width: 100%; border-radius: 0.75rem; border: 1px solid hsl(var(--border)); background: hsl(var(--background)); padding: 0.5rem 0.75rem; font-size: 0.875rem; outline: none; } .loan-input:focus { border-color: hsl(var(--primary)); }`}</style>
     </div>
   );
 }

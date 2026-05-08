@@ -28,13 +28,15 @@ type Ctx = {
   addExpenseFromText: (text: string) => Promise<{ expense: Expense | null; error?: string }>;
   addExpenseManual: (input: { amount: number; description: string; category?: string; method: PaymentMethod; account_id: string }) => Promise<{ expense: Expense | null; error?: string }>;
   removeExpense: (id: string) => Promise<void>;
+  updateExpense: (id: string, patch: Partial<Pick<Expense, "amount" | "description" | "category" | "method" | "account_id" | "occurred_at">>) => Promise<void>;
+  updateAccount: (id: string, patch: Partial<Pick<Account, "name" | "color" | "balance" | "credit_limit" | "credit_used" | "overdraft_limit">>) => Promise<void>;
   updateAccountCreditLimit: (accountId: string, creditLimit: number | null) => Promise<void>;
   updateAccountCreditUsed: (accountId: string, creditUsed: number) => Promise<void>;
   payCreditInvoice: (creditAccountId: string, fromDebitAccountId?: string) => Promise<{ amount: number; fromDebit: Account | undefined } | void>;
   addCreditAccount: (name: string, color: string, creditLimit: number) => Promise<void>;
-  addDebitAccount: (name: string, color: string, balance: number) => Promise<void>;
+  addDebitAccount: (name: string, color: string, balance: number, overdraftLimit?: number | null) => Promise<void>;
   removeAccount: (id: string) => Promise<void>;
-  updateIncome: (patch: Partial<Income>) => Promise<void>;
+  updateIncome: (patch: Partial<Income>, opts?: { applyToFuture?: boolean }) => Promise<void>;
   addRecurringRule: (rule: Omit<RecurringRule, "id" | "profile_id" | "applied_months" | "paid_months">) => Promise<void>;
   removeRecurringRule: (id: string) => Promise<void>;
   markRecurringPaid: (ruleId: string, monthKey: string, overrides?: { account_id?: string; method?: PaymentMethod }) => Promise<void>;
@@ -52,7 +54,7 @@ type Ctx = {
 
 const StoreContext = createContext<Ctx | null>(null);
 
-const DEFAULT_INCOME: Income = { mode: "pj", monthly_salary: 0, hourly_rate: 0, working_days: 0, extra_income: 0 };
+const DEFAULT_INCOME: Income = { mode: "pj", monthly_salary: 0, hourly_rate: 0, working_days: 0, worked_hours: null, extra_income: 0, deposit_account_id: null };
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
@@ -146,7 +148,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         monthly_salary: Number(ir.data.monthly_salary ?? 0),
         hourly_rate: Number(ir.data.hourly_rate ?? 0),
         working_days: Number(ir.data.working_days ?? 0),
+        worked_hours: ir.data.worked_hours != null ? Number(ir.data.worked_hours) : null,
         extra_income: Number(ir.data.extra_income ?? 0),
+        deposit_account_id: (ir.data as any).deposit_account_id ?? null,
       });
     } else if (i.data) {
       setIncome({
@@ -154,7 +158,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         monthly_salary: Number(i.data.monthly_salary ?? 0),
         hourly_rate: Number(i.data.hourly_rate ?? 0),
         working_days: Number(i.data.working_days ?? 0),
+        worked_hours: null,
         extra_income: Number(i.data.extra_income ?? 0),
+        deposit_account_id: null,
       });
     } else {
       setIncome(DEFAULT_INCOME);
@@ -300,7 +306,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (data) setAccounts((prev) => [...prev, data as Account]);
   }, [activeProfile, accounts]);
 
-  const addDebitAccount = useCallback(async (name: string, color: string, balance: number) => {
+  const addDebitAccount = useCallback(async (name: string, color: string, balance: number, overdraftLimit?: number | null) => {
     if (!activeProfile) return;
     const nextPosition = accounts.length ? Math.max(...accounts.map((a) => Number(a.position))) + 1 : 0;
     const { data } = await supabase.from("accounts").insert({
@@ -312,9 +318,41 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       credit_used: 0,
       position: nextPosition,
       kind: "debit",
+      overdraft_limit: overdraftLimit && overdraftLimit > 0 ? overdraftLimit : null,
     } as any).select().single();
     if (data) setAccounts((prev) => [...prev, data as Account]);
   }, [activeProfile, accounts]);
+
+  const updateAccount = useCallback(async (id: string, patch: Partial<Pick<Account, "name" | "color" | "balance" | "credit_limit" | "credit_used" | "overdraft_limit">>) => {
+    await supabase.from("accounts").update(patch as any).eq("id", id);
+    setAccounts((prev) => prev.map((a) => a.id === id ? { ...a, ...patch } : a));
+  }, []);
+
+  const updateExpense = useCallback(async (id: string, patch: Partial<Pick<Expense, "amount" | "description" | "category" | "method" | "account_id" | "occurred_at">>) => {
+    const prev = expenses.find((e) => e.id === id);
+    if (!prev) return;
+    // Reverse old account effect
+    const oldAcc = accounts.find((a) => a.id === prev.account_id);
+    if (oldAcc) {
+      const reverse = prev.method === "credit"
+        ? { credit_used: Math.max(0, Number(oldAcc.credit_used) - Number(prev.amount)) }
+        : { balance: Number(oldAcc.balance) + Number(prev.amount) };
+      await supabase.from("accounts").update(reverse).eq("id", oldAcc.id);
+      setAccounts((p) => p.map((a) => a.id === oldAcc.id ? { ...a, ...reverse } : a));
+    }
+    const next: Expense = { ...prev, ...patch } as Expense;
+    await supabase.from("expenses").update(patch as any).eq("id", id);
+    setExpenses((p) => p.map((e) => e.id === id ? next : e));
+    // Apply new account effect
+    const newAcc = (await supabase.from("accounts").select("*").eq("id", next.account_id).maybeSingle()).data as Account | null;
+    if (newAcc) {
+      const apply = next.method === "credit"
+        ? { credit_used: Number(newAcc.credit_used) + Number(next.amount) }
+        : { balance: Number(newAcc.balance) - Number(next.amount) };
+      await supabase.from("accounts").update(apply).eq("id", newAcc.id);
+      setAccounts((p) => p.map((a) => a.id === newAcc.id ? { ...a, ...apply } : a));
+    }
+  }, [expenses, accounts]);
 
   const removeAccount = useCallback(async (id: string) => {
     await supabase.from("accounts").delete().eq("id", id);
@@ -346,7 +384,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return { expense: data as Expense };
   }, [activeProfile, accounts]);
 
-  const updateIncome = useCallback(async (patch: Partial<Income>) => {
+  const updateIncome = useCallback(async (patch: Partial<Income>, opts?: { applyToFuture?: boolean }) => {
     if (!activeProfile) return;
     const next = { ...income, ...patch };
     setIncome(next);
@@ -355,13 +393,31 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       monthly_salary: next.monthly_salary,
       hourly_rate: next.hourly_rate,
       working_days: next.working_days,
+      worked_hours: next.worked_hours ?? null,
       extra_income: next.extra_income,
+      deposit_account_id: next.deposit_account_id ?? null,
     };
-    await supabase.from("income_settings").upsert({ profile_id: activeProfile.id, ...payload });
-    await supabase.from("income_records").upsert(
-      { profile_id: activeProfile.id, month_key: selectedMonth, ...payload, updated_at: new Date().toISOString() },
-      { onConflict: "profile_id,month_key" },
-    );
+    await supabase.from("income_settings").upsert({ profile_id: activeProfile.id, ...payload } as any);
+    const months: string[] = [selectedMonth];
+    if (opts?.applyToFuture) {
+      const [y, m] = selectedMonth.split("-").map(Number);
+      const baseDate = new Date(y, m - 1, 1);
+      const today = new Date();
+      const startMonth = baseDate >= new Date(today.getFullYear(), today.getMonth(), 1) ? baseDate : new Date(today.getFullYear(), today.getMonth(), 1);
+      const startYear = startMonth.getFullYear();
+      const startMonthIdx = startMonth.getMonth();
+      months.length = 0;
+      for (let mi = startMonthIdx; mi < 12; mi += 1) {
+        months.push(`${startYear}-${String(mi + 1).padStart(2, "0")}`);
+      }
+    }
+    const rows = months.map((mk) => ({
+      profile_id: activeProfile.id,
+      month_key: mk,
+      ...payload,
+      updated_at: new Date().toISOString(),
+    }));
+    await supabase.from("income_records").upsert(rows as any, { onConflict: "profile_id,month_key" });
   }, [income, activeProfile, selectedMonth]);
 
   useEffect(() => {
@@ -572,24 +628,28 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setInstallmentPlans((prev) => prev.filter((p) => p.id !== id));
   }, []);
 
-  const effectiveIncome = useMemo<Income>(() => (
-    income.mode === "pj"
-      ? { ...income, working_days: businessDaysInMonthKey(selectedMonth) }
-      : income
-  ), [income, selectedMonth]);
+  const effectiveIncome = useMemo<Income>(() => {
+    if (income.mode !== "pj") return income;
+    const days = businessDaysInMonthKey(selectedMonth);
+    return {
+      ...income,
+      working_days: days,
+      worked_hours: income.worked_hours && income.worked_hours > 0 ? income.worked_hours : days * 8,
+    };
+  }, [income, selectedMonth]);
 
   const value = useMemo<Ctx>(() => ({
     loading, profiles, activeProfile, selectedMonth, setActiveProfile, setSelectedMonth,
     createProfile, deleteProfile,
     accounts, expenses, income: effectiveIncome, recurringRules, reminders, patterns, loans, installmentPlans,
-    addExpenseFromText, addExpenseManual, removeExpense,
+    addExpenseFromText, addExpenseManual, removeExpense, updateExpense, updateAccount,
     updateAccountCreditLimit, updateAccountCreditUsed, payCreditInvoice, addCreditAccount, addDebitAccount, removeAccount,
     updateIncome,
     addRecurringRule, removeRecurringRule, markRecurringPaid, unmarkRecurringPaid, addReminder, removeReminder,
     addLoan, updateLoan, removeLoan,
     addInstallmentPlan, updateInstallmentPlan, removeInstallmentPlan,
     refresh,
-  }), [loading, profiles, activeProfile, selectedMonth, setActiveProfile, createProfile, deleteProfile, accounts, expenses, effectiveIncome, recurringRules, reminders, patterns, loans, installmentPlans, addExpenseFromText, addExpenseManual, removeExpense, updateAccountCreditLimit, updateAccountCreditUsed, payCreditInvoice, addCreditAccount, addDebitAccount, removeAccount, updateIncome, addRecurringRule, removeRecurringRule, markRecurringPaid, unmarkRecurringPaid, addReminder, removeReminder, addLoan, updateLoan, removeLoan, addInstallmentPlan, updateInstallmentPlan, removeInstallmentPlan, refresh]);
+  }), [loading, profiles, activeProfile, selectedMonth, setActiveProfile, createProfile, deleteProfile, accounts, expenses, effectiveIncome, recurringRules, reminders, patterns, loans, installmentPlans, addExpenseFromText, addExpenseManual, removeExpense, updateExpense, updateAccount, updateAccountCreditLimit, updateAccountCreditUsed, payCreditInvoice, addCreditAccount, addDebitAccount, removeAccount, updateIncome, addRecurringRule, removeRecurringRule, markRecurringPaid, unmarkRecurringPaid, addReminder, removeReminder, addLoan, updateLoan, removeLoan, addInstallmentPlan, updateInstallmentPlan, removeInstallmentPlan, refresh]);
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }
