@@ -66,7 +66,7 @@ export function ExpenseForm({ defaultDate, onSaved, compact }: Props) {
       <div className="grid grid-cols-2 gap-2">
         <div>
           <label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Valor</label>
-          <MoneyInput value={amount} onChange={setAmount} placeholder="0,00" />
+          <MoneyInput value={amount} onChange={setAmount} placeholder="0,00" className="w-full rounded-xl border border-border bg-card px-3 py-2 text-sm outline-none focus:border-primary" />
         </div>
         <div>
           <label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Data</label>
