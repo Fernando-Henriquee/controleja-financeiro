@@ -54,7 +54,7 @@ type Ctx = {
 
 const StoreContext = createContext<Ctx | null>(null);
 
-const DEFAULT_INCOME: Income = { mode: "pj", monthly_salary: 0, hourly_rate: 0, working_days: 0, worked_hours: null, extra_income: 0, deposit_account_id: null };
+const DEFAULT_INCOME: Income = { mode: "pj", monthly_salary: 0, hourly_rate: 0, working_days: 0, worked_hours: null, extra_income: 0, deposit_account_id: null, paid_at: null };
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
@@ -151,6 +151,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         worked_hours: ir.data.worked_hours != null ? Number(ir.data.worked_hours) : null,
         extra_income: Number(ir.data.extra_income ?? 0),
         deposit_account_id: (ir.data as any).deposit_account_id ?? null,
+        paid_at: (ir.data as any).paid_at ?? null,
       });
     } else if (i.data) {
       setIncome({
@@ -161,6 +162,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         worked_hours: null,
         extra_income: Number(i.data.extra_income ?? 0),
         deposit_account_id: null,
+        paid_at: null,
       });
     } else {
       setIncome(DEFAULT_INCOME);
@@ -411,12 +413,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         months.push(`${startYear}-${String(mi + 1).padStart(2, "0")}`);
       }
     }
-    const rows = months.map((mk) => ({
-      profile_id: activeProfile.id,
-      month_key: mk,
-      ...payload,
-      updated_at: new Date().toISOString(),
-    }));
+    const rows = months.map((mk) => {
+      const base: any = {
+        profile_id: activeProfile.id,
+        month_key: mk,
+        ...payload,
+        updated_at: new Date().toISOString(),
+      };
+      // paid_at is per-month: only set on the currently selected month so we
+      // don't overwrite payment dates already saved on other months.
+      if (mk === selectedMonth) base.paid_at = next.paid_at ?? null;
+      return base;
+    });
     await supabase.from("income_records").upsert(rows as any, { onConflict: "profile_id,month_key" });
   }, [income, activeProfile, selectedMonth]);
 

@@ -1,0 +1,1 @@
+ALTER TABLE public.income_records ADD COLUMN IF NOT EXISTS paid_at date;
