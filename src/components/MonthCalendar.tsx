@@ -13,6 +13,7 @@ export function MonthCalendar() {
   const [simSpend, setSimSpend] = useState<number>(0);
   const [selected, setSelected] = useState<DayCell | null>(null);
   const [expanded, setExpanded] = useState(false);
+  const [entryDay, setEntryDay] = useState<DayCell | null>(null);
 
   const real = useMemo(
     () => buildMonthCalendar(selectedMonth, income, expenses),
