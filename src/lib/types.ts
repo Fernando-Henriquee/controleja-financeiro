@@ -54,6 +54,7 @@ export type Expense = {
   account_id: string;
   occurred_at: string;
   raw?: string | null;
+  is_pending?: boolean;
 };
 
 export type Income = {

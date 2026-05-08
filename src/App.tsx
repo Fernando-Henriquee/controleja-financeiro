@@ -10,6 +10,7 @@ import Auth from "./pages/Auth.tsx";
 import Cards from "./pages/Cards.tsx";
 import Dashboard from "./pages/Dashboard.tsx";
 import Plans from "./pages/Plans.tsx";
+import Lancar from "./pages/Lancar.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
 
@@ -27,6 +28,7 @@ const App = () => (
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/auth" element={<Auth />} />
+              <Route path="/lancar" element={<Lancar />} />
               <Route path="/cards" element={<Cards />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/planos" element={<Plans />} />

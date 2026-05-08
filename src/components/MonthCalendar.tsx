@@ -3,6 +3,8 @@ import { useStore } from "@/lib/store";
 import { buildMonthCalendar, fmtBRL, monthLabel, type DayCell } from "@/lib/finance";
 import { cn } from "@/lib/utils";
 import { ChevronDown, ChevronUp } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ExpenseForm } from "@/components/ExpenseForm";
 
 const WEEKDAYS = ["D", "S", "T", "Q", "Q", "S", "S"];
 
@@ -11,6 +13,7 @@ export function MonthCalendar() {
   const [simSpend, setSimSpend] = useState<number>(0);
   const [selected, setSelected] = useState<DayCell | null>(null);
   const [expanded, setExpanded] = useState(false);
+  const [entryDay, setEntryDay] = useState<DayCell | null>(null);
 
   const real = useMemo(
     () => buildMonthCalendar(selectedMonth, income, expenses),
@@ -93,7 +96,7 @@ export function MonthCalendar() {
           <button
             key={idx}
             type="button"
-            onClick={() => cell.inMonth && setSelected(cell)}
+            onClick={() => cell.inMonth && (setSelected(cell), setEntryDay(cell))}
             disabled={!cell.inMonth}
             className={cn(
               "relative aspect-square rounded-lg border p-1 text-left text-[10px] transition",
@@ -202,6 +205,27 @@ export function MonthCalendar() {
       )}
       </>
       )}
+
+      <Dialog open={!!entryDay} onOpenChange={(o) => !o && setEntryDay(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {entryDay && (
+                <>
+                  Lançar gasto · Dia {entryDay.day}
+                  {entryDay.isFuture && <span className="ml-2 text-xs font-normal text-primary">(agendado)</span>}
+                </>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          {entryDay && (
+            <ExpenseForm
+              defaultDate={entryDay.date}
+              onSaved={() => setEntryDay(null)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

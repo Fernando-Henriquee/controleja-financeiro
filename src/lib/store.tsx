@@ -26,7 +26,7 @@ type Ctx = {
   installmentPlans: InstallmentPlan[];
 
   addExpenseFromText: (text: string) => Promise<{ expense: Expense | null; error?: string }>;
-  addExpenseManual: (input: { amount: number; description: string; category?: string; method: PaymentMethod; account_id: string }) => Promise<{ expense: Expense | null; error?: string }>;
+  addExpenseManual: (input: { amount: number; description: string; category?: string; method: PaymentMethod; account_id: string; occurred_at?: string }) => Promise<{ expense: Expense | null; error?: string }>;
   removeExpense: (id: string) => Promise<void>;
   updateExpense: (id: string, patch: Partial<Pick<Expense, "amount" | "description" | "category" | "method" | "account_id" | "occurred_at">>) => Promise<void>;
   updateAccount: (id: string, patch: Partial<Pick<Account, "name" | "color" | "balance" | "credit_limit" | "credit_used" | "overdraft_limit">>) => Promise<void>;
@@ -249,13 +249,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const exp = expenses.find(e => e.id === id);
     if (!exp) return;
     await supabase.from("expenses").delete().eq("id", id);
-    const acc = accounts.find(a => a.id === exp.account_id);
-    if (acc) {
-      const patch = exp.method === "credit"
-        ? { credit_used: Math.max(0, Number(acc.credit_used) - Number(exp.amount)) }
-        : { balance: Number(acc.balance) + Number(exp.amount) };
-      await supabase.from("accounts").update(patch).eq("id", acc.id);
-      setAccounts(prev => prev.map(a => a.id === acc.id ? { ...a, ...patch } : a));
+    if (!exp.is_pending) {
+      const acc = accounts.find(a => a.id === exp.account_id);
+      if (acc) {
+        const patch = exp.method === "credit"
+          ? { credit_used: Math.max(0, Number(acc.credit_used) - Number(exp.amount)) }
+          : { balance: Number(acc.balance) + Number(exp.amount) };
+        await supabase.from("accounts").update(patch).eq("id", acc.id);
+        setAccounts(prev => prev.map(a => a.id === acc.id ? { ...a, ...patch } : a));
+      }
     }
     setExpenses(prev => prev.filter(e => e.id !== id));
   }, [expenses, accounts]);
@@ -373,10 +375,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setAccounts((prev) => prev.filter((a) => a.id !== id));
   }, []);
 
-  const addExpenseManual = useCallback(async (input: { amount: number; description: string; category?: string; method: PaymentMethod; account_id: string }) => {
+  const addExpenseManual = useCallback(async (input: { amount: number; description: string; category?: string; method: PaymentMethod; account_id: string; occurred_at?: string }) => {
     if (!activeProfile) return { expense: null, error: "Selecione um perfil." };
     if (!input.amount || input.amount <= 0) return { expense: null, error: "Valor inválido." };
-    const { data, error } = await supabase.from("expenses").insert({
+    // Detect future date → schedule (pending)
+    let isPending = false;
+    if (input.occurred_at) {
+      const d = new Date(input.occurred_at);
+      const today = new Date();
+      today.setHours(23, 59, 59, 999);
+      if (d.getTime() > today.getTime()) isPending = true;
+    }
+    const insertPayload: any = {
       profile_id: activeProfile.id,
       account_id: input.account_id,
       amount: input.amount,
@@ -384,19 +394,48 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       category: input.category || "Outros",
       method: input.method,
       raw: null,
-    }).select().single();
+      is_pending: isPending,
+    };
+    if (input.occurred_at) insertPayload.occurred_at = input.occurred_at;
+    const { data, error } = await supabase.from("expenses").insert(insertPayload).select().single();
     if (error || !data) return { expense: null, error: error?.message ?? "Falha ao salvar." };
-    const acc = accounts.find((a) => a.id === input.account_id);
-    if (acc) {
-      const patch = input.method === "credit"
-        ? { credit_used: Number(acc.credit_used) + input.amount }
-        : { balance: Number(acc.balance) - input.amount };
-      await supabase.from("accounts").update(patch).eq("id", acc.id);
-      setAccounts((prev) => prev.map((a) => a.id === acc.id ? { ...a, ...patch } : a));
+    if (!isPending) {
+      const acc = accounts.find((a) => a.id === input.account_id);
+      if (acc) {
+        const patch = input.method === "credit"
+          ? { credit_used: Number(acc.credit_used) + input.amount }
+          : { balance: Number(acc.balance) - input.amount };
+        await supabase.from("accounts").update(patch).eq("id", acc.id);
+        setAccounts((prev) => prev.map((a) => a.id === acc.id ? { ...a, ...patch } : a));
+      }
     }
     setExpenses((prev) => [data as Expense, ...prev]);
     return { expense: data as Expense };
   }, [activeProfile, accounts]);
+
+  // Auto-apply pending (future-scheduled) expenses whose date has arrived
+  useEffect(() => {
+    if (!activeProfile) return;
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+    const due = expenses.filter((e) => e.is_pending && new Date(e.occurred_at).getTime() <= today.getTime());
+    if (!due.length) return;
+    (async () => {
+      for (const exp of due) {
+        await supabase.from("expenses").update({ is_pending: false }).eq("id", exp.id);
+        const acc = accounts.find((a) => a.id === exp.account_id);
+        if (acc) {
+          const patch = exp.method === "credit"
+            ? { credit_used: Number(acc.credit_used) + Number(exp.amount) }
+            : { balance: Number(acc.balance) - Number(exp.amount) };
+          await supabase.from("accounts").update(patch).eq("id", acc.id);
+          setAccounts((prev) => prev.map((a) => a.id === acc.id ? { ...a, ...patch } : a));
+        }
+        setExpenses((prev) => prev.map((e) => e.id === exp.id ? { ...e, is_pending: false } : e));
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeProfile, expenses.length]);
 
   const updateIncome = useCallback(async (patch: Partial<Income>, opts?: { applyToFuture?: boolean }) => {
     if (!activeProfile) return;

@@ -6,6 +6,7 @@ import { StripeEmbeddedCheckout } from "@/components/StripeEmbeddedCheckout";
 import { supabase } from "@/integrations/supabase/client";
 import { getStripeEnvironment } from "@/lib/stripe";
 import { Check, Sparkles, ArrowLeft, X, ExternalLink, Loader2 } from "lucide-react";
+import { AppShell } from "@/components/AppShell";
 import { toast } from "sonner";
 
 type PlanCard = {
@@ -98,7 +99,7 @@ export default function Plans() {
   };
 
   return (
-    <main className="min-h-screen bg-gradient-surface pb-16">
+    <AppShell><main className="pb-16">
       <div className="mx-auto max-w-6xl space-y-10 px-4 pt-8 lg:px-6">
         <header className="flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground">
@@ -206,6 +207,6 @@ export default function Plans() {
           </div>
         </div>
       )}
-    </main>
+    </main></AppShell>
   );
 }

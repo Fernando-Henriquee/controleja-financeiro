@@ -15,6 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { expectedMonthlyIncome, fmtBRL, monthKey, monthLabel } from "@/lib/finance";
 import type { Expense } from "@/lib/types";
 import Profiles from "./Profiles";
+import { AppShell } from "@/components/AppShell";
 
 const CATEGORY_COLORS = [
   "hsl(var(--primary))",
@@ -208,7 +209,7 @@ const Dashboard = () => {
   if (!activeProfile) return <Profiles />;
 
   return (
-    <main className="min-h-screen bg-gradient-surface pb-12">
+    <AppShell><main className="pb-12">
       <div className="mx-auto max-w-6xl space-y-5 px-4 pt-6 safe-top lg:px-6">
         <header className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -365,7 +366,7 @@ const Dashboard = () => {
           </>
         )}
       </div>
-    </main>
+    </main></AppShell>
   );
 };
 
