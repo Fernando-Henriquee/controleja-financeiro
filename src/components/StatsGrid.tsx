@@ -1,7 +1,8 @@
 import { Link } from "react-router-dom";
 import { useStore } from "@/lib/store";
 import {
-  totalBalance,
+  totalEffectiveBalance,
+  effectiveAccountBalance,
   totalCreditUsed,
   monthSpent,
   monthProgress,
@@ -13,13 +14,15 @@ import {
   monthLabel,
   totalInstallmentsDueInMonth,
   totalLoanInstallmentsDueInMonth,
+  incomeDepositedToday,
 } from "@/lib/finance";
 import { TrendingDown, TrendingUp, Target, ArrowRight } from "lucide-react";
 
 export function StatsGrid() {
   const { accounts, expenses, income, selectedMonth, loans, installmentPlans } = useStore();
   const debits = accounts.filter((a) => a.kind === "debit");
-  const balance = totalBalance(accounts);
+  const balance = totalEffectiveBalance(accounts, income);
+  const depositedToday = incomeDepositedToday(income);
   const credit = totalCreditUsed(accounts);
   const spent = monthSpent(expenses);
   const incomeTotal = expectedMonthlyIncome(income);
