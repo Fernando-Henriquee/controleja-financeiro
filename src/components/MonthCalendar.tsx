@@ -205,6 +205,27 @@ export function MonthCalendar() {
       )}
       </>
       )}
+
+      <Dialog open={!!entryDay} onOpenChange={(o) => !o && setEntryDay(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {entryDay && (
+                <>
+                  Lançar gasto · Dia {entryDay.day}
+                  {entryDay.isFuture && <span className="ml-2 text-xs font-normal text-primary">(agendado)</span>}
+                </>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          {entryDay && (
+            <ExpenseForm
+              defaultDate={entryDay.date}
+              onSaved={() => setEntryDay(null)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
