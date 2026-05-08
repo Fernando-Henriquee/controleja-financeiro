@@ -97,7 +97,10 @@ export function expectedMonthlyIncome(income: Income): number {
   if (income.mode === "clt") {
     return income.monthly_salary + income.extra_income;
   }
-  return income.hourly_rate * 8 * income.working_days + income.extra_income;
+  const hours = income.worked_hours && income.worked_hours > 0
+    ? income.worked_hours
+    : income.working_days * 8;
+  return income.hourly_rate * hours + income.extra_income;
 }
 
 export function businessDaysInMonth(baseDate = new Date()): number {
