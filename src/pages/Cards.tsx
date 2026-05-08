@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import type { Account, Loan } from "@/lib/types";
 import { ConfirmButton } from "@/components/ConfirmButton";
 import { MoneyInput } from "@/components/MoneyInput";
+import { AppShell } from "@/components/AppShell";
 
 const ACCOUNT_PRESETS = [
   { name: "Itaú", color: "#ec7000" },
@@ -33,7 +34,7 @@ export default function CardsPage() {
   const credits = accounts.filter((a) => a.kind === "credit");
 
   return (
-    <main className="min-h-screen bg-gradient-surface pb-16">
+    <AppShell><main className="pb-16">
       <div className="mx-auto max-w-4xl space-y-5 px-4 pt-6 lg:px-6">
         <header className="flex items-center justify-between">
           <button onClick={() => navigate("/")} className="inline-flex items-center gap-1 rounded-xl border border-border bg-card px-3 py-2 text-xs hover:border-primary">
@@ -70,7 +71,7 @@ export default function CardsPage() {
           )}
         </Section>
       </div>
-    </main>
+    </main></AppShell>
   );
 }
 
