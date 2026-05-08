@@ -272,6 +272,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const payCreditInvoice = useCallback(async (creditAccountId: string, fromDebitAccountId?: string) => {
+    if (!activeProfile) return;
     const card = accounts.find((a) => a.id === creditAccountId);
     if (!card) return;
     const amount = Number(card.credit_used ?? 0);
@@ -287,9 +288,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const newBalance = Number(fromDebit.balance) - amount;
       await supabase.from("accounts").update({ balance: newBalance }).eq("id", fromDebit.id);
       setAccounts((prev) => prev.map((a) => (a.id === fromDebit.id ? { ...a, balance: newBalance } : a)));
+      // Log the invoice payment as an expense so it appears in the unified list.
+      const { data: exp } = await supabase.from("expenses").insert({
+        profile_id: activeProfile.id,
+        account_id: fromDebit.id,
+        amount,
+        description: `[Fatura] ${card.name}`,
+        category: "Moradia",
+        method: "debit",
+        raw: `fatura:${card.id}`,
+      }).select().single();
+      if (exp) setExpenses((prev) => [exp as Expense, ...prev]);
     }
     return { amount, fromDebit };
-  }, [accounts]);
+  }, [accounts, activeProfile]);
 
 
   const addCreditAccount = useCallback(async (name: string, color: string, creditLimit: number) => {
