@@ -152,6 +152,12 @@ export function IncomeSheet() {
                 )}
               </label>
 
+              <PaidAtPicker
+                monthKey={selectedMonth}
+                value={draft.paid_at ?? null}
+                onChange={(v) => setDraft({ ...draft, paid_at: v })}
+              />
+
               <label className="flex items-start gap-2 rounded-xl bg-secondary/40 p-3 text-xs cursor-pointer">
                 <input
                   type="checkbox"
