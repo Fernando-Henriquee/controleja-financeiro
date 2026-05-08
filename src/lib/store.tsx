@@ -413,14 +413,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         months.push(`${startYear}-${String(mi + 1).padStart(2, "0")}`);
       }
     }
-    const rows = months.map((mk) => ({
-      profile_id: activeProfile.id,
-      month_key: mk,
-      ...payload,
-      // paid_at is per-month: only persist on the currently selected month
-      paid_at: mk === selectedMonth ? (next.paid_at ?? null) : null,
-      updated_at: new Date().toISOString(),
-    }));
+    const rows = months.map((mk) => {
+      const base: any = {
+        profile_id: activeProfile.id,
+        month_key: mk,
+        ...payload,
+        updated_at: new Date().toISOString(),
+      };
+      // paid_at is per-month: only set on the currently selected month so we
+      // don't overwrite payment dates already saved on other months.
+      if (mk === selectedMonth) base.paid_at = next.paid_at ?? null;
+      return base;
+    });
     await supabase.from("income_records").upsert(rows as any, { onConflict: "profile_id,month_key" });
   }, [income, activeProfile, selectedMonth]);
 
