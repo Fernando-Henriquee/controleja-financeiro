@@ -50,8 +50,10 @@ export function BankInvoices() {
 
   return (
     <div className="space-y-2">
-      {invoices.map((item) => (
-        <div key={item.id} className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+      {invoices.map((item) => {
+        const critical = item.pct >= 85;
+        return (
+        <div key={item.id} className={`rounded-2xl border bg-card p-4 shadow-sm transition ${critical ? "border-status-danger/40" : "border-border"}`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="grid h-8 w-8 place-items-center rounded-lg text-white" style={{ background: item.color }}>
@@ -69,13 +71,14 @@ export function BankInvoices() {
               className="h-full rounded-full transition-all"
               style={{
                 width: `${item.pct}%`,
-                background: item.pct > 80 ? "hsl(var(--status-danger))" : item.pct > 50 ? "hsl(var(--status-warn))" : "hsl(var(--status-safe))",
+                background: item.pct >= 85 ? "hsl(var(--status-danger))" : item.pct >= 60 ? "hsl(var(--status-warn))" : "hsl(var(--status-safe))",
               }}
             />
           </div>
           <div className="mt-2 flex items-center justify-between gap-2">
             <p className="text-xs text-muted-foreground">
               {fmtBRL(item.used)} / {fmtBRL(item.limit)} ({Math.round(item.pct)}%)
+              {item.pct >= 85 && <span className="ml-2 inline-block rounded-full bg-status-danger-bg px-1.5 py-0.5 text-[10px] font-semibold text-status-danger">Proximo do limite</span>}
             </p>
             {item.used > 0 ? (
               <button
@@ -111,7 +114,8 @@ export function BankInvoices() {
             </div>
           ) : null}
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
