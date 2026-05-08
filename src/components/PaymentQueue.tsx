@@ -48,7 +48,8 @@ export function PaymentQueue({ items }: { items: PaymentPlanItem[] }) {
           return;
         }
         const r = await payCreditInvoice(acc.id);
-        toast.success(`${acc.name}: ${fmtBRL(r?.amount ?? 0)} debitado.`);
+        const amt = (r && typeof r === "object" && "amount" in r) ? r.amount : 0;
+        toast.success(`${acc.name}: ${fmtBRL(amt)} debitado.`);
       } else if (item.kind === "recurring") {
         const r = recurringRules.find((x) => !x.paid_months.includes(selectedMonth) && item.label.toLowerCase().includes(x.description.toLowerCase()))
           ?? findRecurringByLabel(item.label);
