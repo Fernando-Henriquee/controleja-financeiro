@@ -249,13 +249,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const exp = expenses.find(e => e.id === id);
     if (!exp) return;
     await supabase.from("expenses").delete().eq("id", id);
-    const acc = accounts.find(a => a.id === exp.account_id);
-    if (acc) {
-      const patch = exp.method === "credit"
-        ? { credit_used: Math.max(0, Number(acc.credit_used) - Number(exp.amount)) }
-        : { balance: Number(acc.balance) + Number(exp.amount) };
-      await supabase.from("accounts").update(patch).eq("id", acc.id);
-      setAccounts(prev => prev.map(a => a.id === acc.id ? { ...a, ...patch } : a));
+    if (!exp.is_pending) {
+      const acc = accounts.find(a => a.id === exp.account_id);
+      if (acc) {
+        const patch = exp.method === "credit"
+          ? { credit_used: Math.max(0, Number(acc.credit_used) - Number(exp.amount)) }
+          : { balance: Number(acc.balance) + Number(exp.amount) };
+        await supabase.from("accounts").update(patch).eq("id", acc.id);
+        setAccounts(prev => prev.map(a => a.id === acc.id ? { ...a, ...patch } : a));
+      }
     }
     setExpenses(prev => prev.filter(e => e.id !== id));
   }, [expenses, accounts]);
