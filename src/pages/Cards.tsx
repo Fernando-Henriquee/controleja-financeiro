@@ -961,13 +961,26 @@ function LoanRow({ loan }: { loan: Loan }) {
 
       {loan.notes && !editing ? <p className="mt-2 text-[11px] text-muted-foreground">{loan.notes}</p> : null}
 
-      <div className="mt-3 flex gap-2">
-        <button onClick={pay} disabled={loan.paid_installments >= loan.total_installments} className="flex-1 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-60">
-          Marcar parcela paga
-        </button>
-        <button onClick={unpay} disabled={loan.paid_installments <= 0} className="rounded-lg border border-border px-3 py-1.5 text-xs hover:border-primary disabled:opacity-60">
-          Desfazer
-        </button>
+      <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+        <label className="flex flex-1 items-center gap-2 text-[11px] text-muted-foreground">
+          <span className="shrink-0">Pagar de:</span>
+          <select
+            value={payAccountId}
+            onChange={(e) => setPayAccountId(e.target.value)}
+            className="loan-input flex-1 text-xs"
+          >
+            {debits.length === 0 && <option value="">— sem conta de débito —</option>}
+            {debits.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+          </select>
+        </label>
+        <div className="flex gap-2">
+          <button onClick={pay} disabled={loan.paid_installments >= loan.total_installments || !payAccountId} className="flex-1 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-60">
+            Marcar parcela paga
+          </button>
+          <button onClick={unpay} disabled={loan.paid_installments <= 0} className="rounded-lg border border-border px-3 py-1.5 text-xs hover:border-primary disabled:opacity-60">
+            Desfazer
+          </button>
+        </div>
       </div>
       <style>{`.loan-input { width: 100%; border-radius: 0.75rem; border: 1px solid hsl(var(--border)); background: hsl(var(--background)); padding: 0.5rem 0.75rem; font-size: 0.875rem; outline: none; } .loan-input:focus { border-color: hsl(var(--primary)); }`}</style>
     </div>
