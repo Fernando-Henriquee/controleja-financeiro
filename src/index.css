@@ -58,6 +58,15 @@
     --shadow-glow: 0 0 32px hsl(217 95% 70% / 0.35);
 
     --radius: 1rem;
+
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 222 47% 11%;
+    --sidebar-primary: 217 91% 60%;
+    --sidebar-primary-foreground: 210 40% 99%;
+    --sidebar-accent: 213 28% 95%;
+    --sidebar-accent-foreground: 222 47% 11%;
+    --sidebar-border: 214 25% 91%;
+    --sidebar-ring: 217 91% 60%;
   }
 }
 
