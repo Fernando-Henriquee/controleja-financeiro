@@ -628,24 +628,28 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setInstallmentPlans((prev) => prev.filter((p) => p.id !== id));
   }, []);
 
-  const effectiveIncome = useMemo<Income>(() => (
-    income.mode === "pj"
-      ? { ...income, working_days: businessDaysInMonthKey(selectedMonth) }
-      : income
-  ), [income, selectedMonth]);
+  const effectiveIncome = useMemo<Income>(() => {
+    if (income.mode !== "pj") return income;
+    const days = businessDaysInMonthKey(selectedMonth);
+    return {
+      ...income,
+      working_days: days,
+      worked_hours: income.worked_hours && income.worked_hours > 0 ? income.worked_hours : days * 8,
+    };
+  }, [income, selectedMonth]);
 
   const value = useMemo<Ctx>(() => ({
     loading, profiles, activeProfile, selectedMonth, setActiveProfile, setSelectedMonth,
     createProfile, deleteProfile,
     accounts, expenses, income: effectiveIncome, recurringRules, reminders, patterns, loans, installmentPlans,
-    addExpenseFromText, addExpenseManual, removeExpense,
+    addExpenseFromText, addExpenseManual, removeExpense, updateExpense, updateAccount,
     updateAccountCreditLimit, updateAccountCreditUsed, payCreditInvoice, addCreditAccount, addDebitAccount, removeAccount,
     updateIncome,
     addRecurringRule, removeRecurringRule, markRecurringPaid, unmarkRecurringPaid, addReminder, removeReminder,
     addLoan, updateLoan, removeLoan,
     addInstallmentPlan, updateInstallmentPlan, removeInstallmentPlan,
     refresh,
-  }), [loading, profiles, activeProfile, selectedMonth, setActiveProfile, createProfile, deleteProfile, accounts, expenses, effectiveIncome, recurringRules, reminders, patterns, loans, installmentPlans, addExpenseFromText, addExpenseManual, removeExpense, updateAccountCreditLimit, updateAccountCreditUsed, payCreditInvoice, addCreditAccount, addDebitAccount, removeAccount, updateIncome, addRecurringRule, removeRecurringRule, markRecurringPaid, unmarkRecurringPaid, addReminder, removeReminder, addLoan, updateLoan, removeLoan, addInstallmentPlan, updateInstallmentPlan, removeInstallmentPlan, refresh]);
+  }), [loading, profiles, activeProfile, selectedMonth, setActiveProfile, createProfile, deleteProfile, accounts, expenses, effectiveIncome, recurringRules, reminders, patterns, loans, installmentPlans, addExpenseFromText, addExpenseManual, removeExpense, updateExpense, updateAccount, updateAccountCreditLimit, updateAccountCreditUsed, payCreditInvoice, addCreditAccount, addDebitAccount, removeAccount, updateIncome, addRecurringRule, removeRecurringRule, markRecurringPaid, unmarkRecurringPaid, addReminder, removeReminder, addLoan, updateLoan, removeLoan, addInstallmentPlan, updateInstallmentPlan, removeInstallmentPlan, refresh]);
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }
