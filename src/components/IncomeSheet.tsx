@@ -205,3 +205,65 @@ function ModeButton({ active, onClick, children }: { active: boolean; onClick: (
     </button>
   );
 }
+
+function PaidAtPicker({ monthKey: mk, value, onChange }: { monthKey: string; value: string | null; onChange: (v: string | null) => void }) {
+  const [open, setOpen] = useState(false);
+  const [y, m] = mk.split("-").map(Number);
+  const monthDate = new Date(y, m - 1, 1);
+  const selected = value ? parseISO(value) : undefined;
+
+  return (
+    <div className="rounded-xl border border-border bg-background p-3">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <div className="grid h-7 w-7 place-items-center rounded-lg bg-primary/10 text-primary">
+            <CalendarCheck2 className="h-3.5 w-3.5" />
+          </div>
+          <div>
+            <p className="text-xs font-medium">Dia do pagamento</p>
+            <p className="text-[11px] text-muted-foreground">
+              {selected ? format(selected, "dd 'de' MMMM", { locale: ptBR }) : "Ainda não recebido"}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-1">
+          {selected && (
+            <button
+              type="button"
+              onClick={() => onChange(null)}
+              className="rounded-lg px-2 py-1 text-[11px] text-muted-foreground hover:bg-secondary"
+            >
+              Limpar
+            </button>
+          )}
+          <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className="rounded-lg border border-border px-2 py-1 text-[11px] font-medium hover:border-primary"
+              >
+                {selected ? "Alterar" : "Marcar"}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <Calendar
+                mode="single"
+                selected={selected}
+                defaultMonth={selected ?? monthDate}
+                onSelect={(d) => {
+                  if (d) {
+                    onChange(format(d, "yyyy-MM-dd"));
+                    setOpen(false);
+                  }
+                }}
+                locale={ptBR}
+                initialFocus
+                className={cn("p-3 pointer-events-auto")}
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
+      </div>
+    </div>
+  );
+}
