@@ -384,7 +384,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return { expense: data as Expense };
   }, [activeProfile, accounts]);
 
-  const updateIncome = useCallback(async (patch: Partial<Income>) => {
+  const updateIncome = useCallback(async (patch: Partial<Income>, opts?: { applyToFuture?: boolean }) => {
     if (!activeProfile) return;
     const next = { ...income, ...patch };
     setIncome(next);
@@ -393,13 +393,31 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       monthly_salary: next.monthly_salary,
       hourly_rate: next.hourly_rate,
       working_days: next.working_days,
+      worked_hours: next.worked_hours ?? null,
       extra_income: next.extra_income,
+      deposit_account_id: next.deposit_account_id ?? null,
     };
-    await supabase.from("income_settings").upsert({ profile_id: activeProfile.id, ...payload });
-    await supabase.from("income_records").upsert(
-      { profile_id: activeProfile.id, month_key: selectedMonth, ...payload, updated_at: new Date().toISOString() },
-      { onConflict: "profile_id,month_key" },
-    );
+    await supabase.from("income_settings").upsert({ profile_id: activeProfile.id, ...payload } as any);
+    const months: string[] = [selectedMonth];
+    if (opts?.applyToFuture) {
+      const [y, m] = selectedMonth.split("-").map(Number);
+      const baseDate = new Date(y, m - 1, 1);
+      const today = new Date();
+      const startMonth = baseDate >= new Date(today.getFullYear(), today.getMonth(), 1) ? baseDate : new Date(today.getFullYear(), today.getMonth(), 1);
+      const startYear = startMonth.getFullYear();
+      const startMonthIdx = startMonth.getMonth();
+      months.length = 0;
+      for (let mi = startMonthIdx; mi < 12; mi += 1) {
+        months.push(`${startYear}-${String(mi + 1).padStart(2, "0")}`);
+      }
+    }
+    const rows = months.map((mk) => ({
+      profile_id: activeProfile.id,
+      month_key: mk,
+      ...payload,
+      updated_at: new Date().toISOString(),
+    }));
+    await supabase.from("income_records").upsert(rows as any, { onConflict: "profile_id,month_key" });
   }, [income, activeProfile, selectedMonth]);
 
   useEffect(() => {
