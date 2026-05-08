@@ -61,7 +61,9 @@ export type Income = {
   monthly_salary: number;
   hourly_rate: number;
   working_days: number;
+  worked_hours?: number | null;
   extra_income: number;
+  deposit_account_id?: string | null;
 };
 
 export type RecurringRule = {
