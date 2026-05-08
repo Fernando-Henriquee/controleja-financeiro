@@ -830,6 +830,28 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function LoanRow({ loan }: { loan: Loan }) {
   const { updateLoan, removeLoan } = useStore();
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState({
+    bank: loan.bank,
+    total_amount: Number(loan.total_amount),
+    installment_amount: Number(loan.installment_amount),
+    total_installments: loan.total_installments,
+    paid_installments: loan.paid_installments,
+    payment_day: loan.payment_day,
+    notes: loan.notes ?? "",
+  });
+  useEffect(() => {
+    setDraft({
+      bank: loan.bank,
+      total_amount: Number(loan.total_amount),
+      installment_amount: Number(loan.installment_amount),
+      total_installments: loan.total_installments,
+      paid_installments: loan.paid_installments,
+      payment_day: loan.payment_day,
+      notes: loan.notes ?? "",
+    });
+  }, [loan]);
+
   const remaining = Math.max(0, loan.total_installments - loan.paid_installments);
   const remainingValue = remaining * Number(loan.installment_amount);
   const pct = loan.total_installments > 0 ? Math.min(100, (loan.paid_installments / loan.total_installments) * 100) : 0;
@@ -839,10 +861,23 @@ function LoanRow({ loan }: { loan: Loan }) {
     await updateLoan(loan.id, { paid_installments: loan.paid_installments + 1 });
     toast.success("Parcela registrada como paga.");
   }
-
   async function unpay() {
     if (loan.paid_installments <= 0) return;
     await updateLoan(loan.id, { paid_installments: loan.paid_installments - 1 });
+  }
+  async function saveEdit() {
+    if (!draft.bank.trim()) { toast.error("Informe o banco."); return; }
+    await updateLoan(loan.id, {
+      bank: draft.bank.trim(),
+      total_amount: draft.total_amount,
+      installment_amount: draft.installment_amount,
+      total_installments: Math.max(1, Number(draft.total_installments) || 1),
+      paid_installments: Math.max(0, Number(draft.paid_installments) || 0),
+      payment_day: Math.min(31, Math.max(1, Number(draft.payment_day) || 1)),
+      notes: draft.notes.trim() || null,
+    });
+    setEditing(false);
+    toast.success("Empréstimo atualizado.");
   }
 
   return (
@@ -857,16 +892,52 @@ function LoanRow({ loan }: { loan: Loan }) {
             <p className="text-[11px] text-muted-foreground">Pagamento todo dia {loan.payment_day}</p>
           </div>
         </div>
-        <ConfirmButton
-          onConfirm={() => removeLoan(loan.id)}
-          title={`Remover empréstimo ${loan.bank}?`}
-          description="Esta ação não pode ser desfeita."
-          className="text-muted-foreground hover:text-status-danger"
-          ariaLabel="Remover"
-        >
-          <Trash2 className="h-4 w-4" />
-        </ConfirmButton>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setEditing((v) => !v)} className="rounded-lg border border-border px-2 py-1 text-[11px] hover:border-primary">
+            {editing ? "Fechar" : "Editar"}
+          </button>
+          <ConfirmButton
+            onConfirm={() => removeLoan(loan.id)}
+            title={`Remover empréstimo ${loan.bank}?`}
+            description="Esta ação não pode ser desfeita."
+            className="text-muted-foreground hover:text-status-danger"
+            ariaLabel="Remover"
+          >
+            <Trash2 className="h-4 w-4" />
+          </ConfirmButton>
+        </div>
       </div>
+
+      {editing ? (
+        <div className="mt-3 grid gap-2 border-t border-border pt-3 sm:grid-cols-2">
+          <Field label="Banco">
+            <input value={draft.bank} onChange={(e) => setDraft({ ...draft, bank: e.target.value })} className="loan-input" />
+          </Field>
+          <Field label="Dia de pagamento">
+            <input type="number" min="1" max="31" value={draft.payment_day} onChange={(e) => setDraft({ ...draft, payment_day: Number(e.target.value) })} className="loan-input" />
+          </Field>
+          <Field label="Valor total">
+            <MoneyInput value={draft.total_amount} onChange={(v) => setDraft({ ...draft, total_amount: v })} className="loan-input" />
+          </Field>
+          <Field label="Valor da parcela">
+            <MoneyInput value={draft.installment_amount} onChange={(v) => setDraft({ ...draft, installment_amount: v })} className="loan-input" />
+          </Field>
+          <Field label="Total de parcelas">
+            <input type="number" min="1" value={draft.total_installments} onChange={(e) => setDraft({ ...draft, total_installments: Number(e.target.value) })} className="loan-input" />
+          </Field>
+          <Field label="Parcelas pagas">
+            <input type="number" min="0" value={draft.paid_installments} onChange={(e) => setDraft({ ...draft, paid_installments: Number(e.target.value) })} className="loan-input" />
+          </Field>
+          <div className="sm:col-span-2">
+            <Field label="Observações">
+              <textarea value={draft.notes} onChange={(e) => setDraft({ ...draft, notes: e.target.value })} rows={2} className="loan-input resize-none" />
+            </Field>
+          </div>
+          <div className="sm:col-span-2 flex justify-end">
+            <button onClick={saveEdit} className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground">Salvar</button>
+          </div>
+        </div>
+      ) : null}
 
       <div className="mt-3 grid grid-cols-3 gap-2 text-center">
         <Stat label="Total" value={fmtBRL(Number(loan.total_amount))} />
@@ -882,7 +953,7 @@ function LoanRow({ loan }: { loan: Loan }) {
         <div className="h-full rounded-full bg-status-safe transition-all" style={{ width: `${pct}%` }} />
       </div>
 
-      {loan.notes ? <p className="mt-2 text-[11px] text-muted-foreground">{loan.notes}</p> : null}
+      {loan.notes && !editing ? <p className="mt-2 text-[11px] text-muted-foreground">{loan.notes}</p> : null}
 
       <div className="mt-3 flex gap-2">
         <button onClick={pay} disabled={loan.paid_installments >= loan.total_installments} className="flex-1 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-60">
@@ -892,6 +963,7 @@ function LoanRow({ loan }: { loan: Loan }) {
           Desfazer
         </button>
       </div>
+      <style>{`.loan-input { width: 100%; border-radius: 0.75rem; border: 1px solid hsl(var(--border)); background: hsl(var(--background)); padding: 0.5rem 0.75rem; font-size: 0.875rem; outline: none; } .loan-input:focus { border-color: hsl(var(--primary)); }`}</style>
     </div>
   );
 }
