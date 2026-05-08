@@ -30,6 +30,7 @@ type Ctx = {
   removeExpense: (id: string) => Promise<void>;
   updateAccountCreditLimit: (accountId: string, creditLimit: number | null) => Promise<void>;
   updateAccountCreditUsed: (accountId: string, creditUsed: number) => Promise<void>;
+  payCreditInvoice: (creditAccountId: string, fromDebitAccountId?: string) => Promise<{ amount: number; fromDebit: Account | undefined } | void>;
   addCreditAccount: (name: string, color: string, creditLimit: number) => Promise<void>;
   addDebitAccount: (name: string, color: string, balance: number) => Promise<void>;
   removeAccount: (id: string) => Promise<void>;
@@ -261,6 +262,27 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     await supabase.from("accounts").update({ credit_used: normalized }).eq("id", accountId);
     setAccounts((prev) => prev.map((a) => (a.id === accountId ? { ...a, credit_used: normalized } : a)));
   }, []);
+
+  const payCreditInvoice = useCallback(async (creditAccountId: string, fromDebitAccountId?: string) => {
+    const card = accounts.find((a) => a.id === creditAccountId);
+    if (!card) return;
+    const amount = Number(card.credit_used ?? 0);
+    if (amount <= 0) return;
+    // Pick debit account: explicit -> same name -> first debit
+    const fromDebit =
+      accounts.find((a) => a.id === fromDebitAccountId && a.kind === "debit") ??
+      accounts.find((a) => a.kind === "debit" && a.name.toLowerCase() === card.name.toLowerCase()) ??
+      accounts.find((a) => a.kind === "debit");
+    await supabase.from("accounts").update({ credit_used: 0 }).eq("id", card.id);
+    setAccounts((prev) => prev.map((a) => (a.id === card.id ? { ...a, credit_used: 0 } : a)));
+    if (fromDebit) {
+      const newBalance = Number(fromDebit.balance) - amount;
+      await supabase.from("accounts").update({ balance: newBalance }).eq("id", fromDebit.id);
+      setAccounts((prev) => prev.map((a) => (a.id === fromDebit.id ? { ...a, balance: newBalance } : a)));
+    }
+    return { amount, fromDebit };
+  }, [accounts]);
+
 
   const addCreditAccount = useCallback(async (name: string, color: string, creditLimit: number) => {
     if (!activeProfile) return;
@@ -561,13 +583,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     createProfile, deleteProfile,
     accounts, expenses, income: effectiveIncome, recurringRules, reminders, patterns, loans, installmentPlans,
     addExpenseFromText, addExpenseManual, removeExpense,
-    updateAccountCreditLimit, updateAccountCreditUsed, addCreditAccount, addDebitAccount, removeAccount,
+    updateAccountCreditLimit, updateAccountCreditUsed, payCreditInvoice, addCreditAccount, addDebitAccount, removeAccount,
     updateIncome,
     addRecurringRule, removeRecurringRule, markRecurringPaid, unmarkRecurringPaid, addReminder, removeReminder,
     addLoan, updateLoan, removeLoan,
     addInstallmentPlan, updateInstallmentPlan, removeInstallmentPlan,
     refresh,
-  }), [loading, profiles, activeProfile, selectedMonth, setActiveProfile, createProfile, deleteProfile, accounts, expenses, effectiveIncome, recurringRules, reminders, patterns, loans, installmentPlans, addExpenseFromText, addExpenseManual, removeExpense, updateAccountCreditLimit, updateAccountCreditUsed, addCreditAccount, addDebitAccount, removeAccount, updateIncome, addRecurringRule, removeRecurringRule, markRecurringPaid, unmarkRecurringPaid, addReminder, removeReminder, addLoan, updateLoan, removeLoan, addInstallmentPlan, updateInstallmentPlan, removeInstallmentPlan, refresh]);
+  }), [loading, profiles, activeProfile, selectedMonth, setActiveProfile, createProfile, deleteProfile, accounts, expenses, effectiveIncome, recurringRules, reminders, patterns, loans, installmentPlans, addExpenseFromText, addExpenseManual, removeExpense, updateAccountCreditLimit, updateAccountCreditUsed, payCreditInvoice, addCreditAccount, addDebitAccount, removeAccount, updateIncome, addRecurringRule, removeRecurringRule, markRecurringPaid, unmarkRecurringPaid, addReminder, removeReminder, addLoan, updateLoan, removeLoan, addInstallmentPlan, updateInstallmentPlan, removeInstallmentPlan, refresh]);
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }
