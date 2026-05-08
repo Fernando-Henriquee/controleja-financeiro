@@ -2,8 +2,13 @@ import { ReactNode, useEffect, useState } from "react";
 import { useStore } from "@/lib/store";
 import { businessDaysInMonthKey, expectedMonthlyIncome, fmtBRL, monthKey, monthLabel } from "@/lib/finance";
 import { MoneyInput } from "@/components/MoneyInput";
-import { Settings2, X } from "lucide-react";
+import { CalendarCheck2, Settings2, X } from "lucide-react";
 import { toast } from "sonner";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { format, parseISO } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 
 export function IncomeSheet() {
   const { income, updateIncome, selectedMonth, accounts } = useStore();
