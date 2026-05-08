@@ -272,6 +272,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const payCreditInvoice = useCallback(async (creditAccountId: string, fromDebitAccountId?: string) => {
+    if (!activeProfile) return;
     const card = accounts.find((a) => a.id === creditAccountId);
     if (!card) return;
     const amount = Number(card.credit_used ?? 0);
@@ -287,9 +288,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const newBalance = Number(fromDebit.balance) - amount;
       await supabase.from("accounts").update({ balance: newBalance }).eq("id", fromDebit.id);
       setAccounts((prev) => prev.map((a) => (a.id === fromDebit.id ? { ...a, balance: newBalance } : a)));
+      // Log the invoice payment as an expense so it appears in the unified list.
+      const { data: exp } = await supabase.from("expenses").insert({
+        profile_id: activeProfile.id,
+        account_id: fromDebit.id,
+        amount,
+        description: `[Fatura] ${card.name}`,
+        category: "Moradia",
+        method: "debit",
+        raw: `fatura:${card.id}`,
+      }).select().single();
+      if (exp) setExpenses((prev) => [exp as Expense, ...prev]);
     }
     return { amount, fromDebit };
-  }, [accounts]);
+  }, [accounts, activeProfile]);
 
 
   const addCreditAccount = useCallback(async (name: string, color: string, creditLimit: number) => {
@@ -613,6 +625,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [activeProfile]);
 
   const updateInstallmentPlan = useCallback(async (id: string, patch: Partial<Omit<InstallmentPlan, "id" | "profile_id">>) => {
+    const prev = installmentPlans.find((p) => p.id === id);
     const { data } = await supabase.from("installment_plans").update(patch).eq("id", id).select().single();
     if (data) {
       const row = data as Record<string, unknown>;
@@ -627,9 +640,27 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         first_month_key: String(row.first_month_key),
         paid_installments: Number(row.paid_installments ?? 0),
       };
-      setInstallmentPlans((prev) => prev.map((p) => (p.id === id ? next : p)));
+      setInstallmentPlans((p) => p.map((pl) => (pl.id === id ? next : pl)));
+
+      // If a new installment was just paid, log it as an expense so it shows in the list.
+      const delta = next.paid_installments - (prev?.paid_installments ?? 0);
+      if (activeProfile && delta > 0 && next.account_id) {
+        for (let k = 0; k < delta; k += 1) {
+          const idx = (prev?.paid_installments ?? 0) + k + 1;
+          const { data: exp } = await supabase.from("expenses").insert({
+            profile_id: activeProfile.id,
+            account_id: next.account_id,
+            amount: next.installment_amount,
+            description: `[Parcela ${idx}/${next.installment_count}] ${next.description || "Compra parcelada"}`,
+            category: "Compras",
+            method: "credit",
+            raw: `parcela:${next.id}:${idx}`,
+          }).select().single();
+          if (exp) setExpenses((s) => [exp as Expense, ...s]);
+        }
+      }
     }
-  }, []);
+  }, [installmentPlans, activeProfile]);
 
   const removeInstallmentPlan = useCallback(async (id: string) => {
     await supabase.from("installment_plans").delete().eq("id", id);
