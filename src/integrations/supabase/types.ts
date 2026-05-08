@@ -206,6 +206,7 @@ export type Database = {
           mode: string
           month_key: string
           monthly_salary: number
+          paid_at: string | null
           profile_id: string
           updated_at: string
           worked_hours: number | null
@@ -220,6 +221,7 @@ export type Database = {
           mode?: string
           month_key: string
           monthly_salary?: number
+          paid_at?: string | null
           profile_id: string
           updated_at?: string
           worked_hours?: number | null
@@ -234,6 +236,7 @@ export type Database = {
           mode?: string
           month_key?: string
           monthly_salary?: number
+          paid_at?: string | null
           profile_id?: string
           updated_at?: string
           worked_hours?: number | null
