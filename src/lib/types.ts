@@ -18,6 +18,7 @@ export type Account = {
   credit_used: number;
   position: number;
   kind: AccountKind;
+  overdraft_limit?: number | null;
 };
 
 export type Loan = {
