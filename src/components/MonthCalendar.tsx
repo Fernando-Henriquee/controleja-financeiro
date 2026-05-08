@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
 import { buildMonthCalendar, fmtBRL, monthLabel, type DayCell } from "@/lib/finance";
 import { cn } from "@/lib/utils";
+import { ChevronDown, ChevronUp } from "lucide-react";
 
 const WEEKDAYS = ["D", "S", "T", "Q", "Q", "S", "S"];
 
@@ -9,6 +10,7 @@ export function MonthCalendar() {
   const { selectedMonth, income, expenses } = useStore();
   const [simSpend, setSimSpend] = useState<number>(0);
   const [selected, setSelected] = useState<DayCell | null>(null);
+  const [expanded, setExpanded] = useState(false);
 
   const real = useMemo(
     () => buildMonthCalendar(selectedMonth, income, expenses),
@@ -47,19 +49,36 @@ export function MonthCalendar() {
   const overUnder = avgDaily - limit;
 
   return (
-    <div className="rounded-3xl border border-border bg-card p-4 shadow-sm">
-      <header className="mb-3 flex items-end justify-between gap-2">
+    <div className="rounded-2xl border border-border bg-card p-3 shadow-sm">
+      <header className="flex items-center justify-between gap-2">
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">Calendário</p>
-          <h3 className="font-display text-lg font-bold capitalize">{monthName}</h3>
+          <h3 className="font-display text-sm font-bold capitalize">{monthName}</h3>
         </div>
-        <div className="text-right">
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Limite/dia sugerido</p>
-          <p className="font-display text-base font-bold text-primary">{fmtBRL(real.evenDailyLimit)}</p>
+        <div className="flex items-center gap-3">
+          <div className="text-right">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Limite/dia</p>
+            <p className="font-display text-sm font-bold text-primary tabular-nums">{fmtBRL(real.evenDailyLimit)}</p>
+          </div>
+          <button
+            onClick={() => setExpanded(v => !v)}
+            className="rounded-full border border-border bg-secondary/40 p-1.5 hover:border-primary/40"
+            aria-label={expanded ? "Recolher" : "Expandir"}
+          >
+            {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+          </button>
         </div>
       </header>
 
-      <div className="mb-3 grid grid-cols-3 gap-2 text-center">
+      {!expanded ? (
+        <div className="mt-2 grid grid-cols-3 gap-2 text-center">
+          <Stat label="Gasto" value={fmtBRL(real.spentSoFar)} />
+          <Stat label="Projeção" value={fmtBRL(view.projectedTotal)} tone={view.endBalance < 0 ? "danger" : "default"} />
+          <Stat label={view.endBalance < 0 ? "Vermelho" : "Sobra"} value={fmtBRL(view.endBalance)} tone={view.endBalance < 0 ? "danger" : "safe"} />
+        </div>
+      ) : (
+      <>
+      <div className="mt-3 grid grid-cols-3 gap-2 text-center">
         <Stat label="Gasto até hoje" value={fmtBRL(real.spentSoFar)} />
         <Stat label="Projeção fim mês" value={fmtBRL(view.projectedTotal)} tone={view.endBalance < 0 ? "danger" : "default"} />
         <Stat label={view.endBalance < 0 ? "No vermelho" : "Sobra estimada"} value={fmtBRL(view.endBalance)} tone={view.endBalance < 0 ? "danger" : "safe"} />
@@ -180,6 +199,8 @@ export function MonthCalendar() {
             Saldo estimado após este dia: <span className={cn("font-semibold", selected.cumulativeBalance < 0 ? "text-rose-500" : "text-foreground")}>{fmtBRL(selected.cumulativeBalance)}</span>
           </p>
         </div>
+      )}
+      </>
       )}
     </div>
   );

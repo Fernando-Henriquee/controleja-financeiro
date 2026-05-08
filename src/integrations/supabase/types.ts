@@ -61,6 +61,33 @@ export type Database = {
           },
         ]
       }
+      coach_conversations: {
+        Row: {
+          created_at: string
+          id: string
+          messages: Json
+          month_key: string
+          profile_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          messages?: Json
+          month_key: string
+          profile_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          messages?: Json
+          month_key?: string
+          profile_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       expense_patterns: {
         Row: {
           account_id: string
