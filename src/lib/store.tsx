@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Account, AccountKind, Expense, ExpensePattern, Income, InstallmentPlan, Loan, PaymentMethod, Profile, RecurringRule, Reminder } from "./types";
-import { businessDaysInMonth, businessDaysInMonthKey, monthDateRange, monthKey, parseExpenseWithHistory } from "./finance";
+import { businessDaysInMonth, businessDaysInMonthKey, expectedMonthlyIncome, monthDateRange, monthKey, parseExpenseWithHistory } from "./finance";
 import { useAuth } from "./auth";
 
 const ACTIVE_KEY = "copilot.activeProfileId";
@@ -400,6 +400,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const updateIncome = useCallback(async (patch: Partial<Income>, opts?: { applyToFuture?: boolean }) => {
     if (!activeProfile) return;
+    const prev = income;
     const next = { ...income, ...patch };
     setIncome(next);
     const payload = {
@@ -432,13 +433,28 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         ...payload,
         updated_at: new Date().toISOString(),
       };
-      // paid_at is per-month: only set on the currently selected month so we
-      // don't overwrite payment dates already saved on other months.
       if (mk === selectedMonth) base.paid_at = next.paid_at ?? null;
       return base;
     });
     await supabase.from("income_records").upsert(rows as any, { onConflict: "profile_id,month_key" });
-  }, [income, activeProfile, selectedMonth]);
+
+    // One-time deposit on transition: when paid_at goes from null → set,
+    // credit the chosen account balance with the month's expected income.
+    // When unset, debit it back. Keeps stored balance authoritative.
+    const wasPaid = !!prev.paid_at;
+    const isPaid = !!next.paid_at;
+    const acctId = next.deposit_account_id ?? prev.deposit_account_id;
+    if (acctId && wasPaid !== isPaid) {
+      const amount = expectedMonthlyIncome(next);
+      const acc = accounts.find((a) => a.id === acctId);
+      if (acc && amount > 0) {
+        const delta = isPaid ? amount : -amount;
+        const newBalance = Number(acc.balance) + delta;
+        await supabase.from("accounts").update({ balance: newBalance }).eq("id", acc.id);
+        setAccounts((p) => p.map((a) => a.id === acc.id ? { ...a, balance: newBalance } : a));
+      }
+    }
+  }, [income, activeProfile, selectedMonth, accounts]);
 
   useEffect(() => {
     if (!activeProfile || !recurringRules.length) return;

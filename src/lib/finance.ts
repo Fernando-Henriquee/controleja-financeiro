@@ -122,23 +122,16 @@ export function businessDaysInMonthKey(key: string): number {
 export function totalBalance(accounts: Account[]): number {
   return accounts.reduce((a, x) => a + Number(x.balance), 0);
 }
-// Adds the month's income to the deposit account once `paid_at` has arrived.
-// Stored `account.balance` is not mutated; this is a derived view-only value.
-export function incomeDepositedToday(income: Income): number {
-  if (!income.paid_at || !income.deposit_account_id) return 0;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const paid = new Date(`${income.paid_at}T00:00:00`);
-  if (paid > today) return 0;
-  return expectedMonthlyIncome(income);
+// Marking the income as paid credits the account balance once (see store.updateIncome).
+// These helpers stay for compatibility but no longer add anything on top of stored balance.
+export function incomeDepositedToday(_income: Income): number {
+  return 0;
 }
-export function effectiveAccountBalance(account: Account, income: Income): number {
-  const base = Number(account.balance);
-  if (income.deposit_account_id !== account.id) return base;
-  return base + incomeDepositedToday(income);
+export function effectiveAccountBalance(account: Account, _income: Income): number {
+  return Number(account.balance);
 }
-export function totalEffectiveBalance(accounts: Account[], income: Income): number {
-  return accounts.reduce((a, x) => a + effectiveAccountBalance(x, income), 0);
+export function totalEffectiveBalance(accounts: Account[], _income?: Income): number {
+  return accounts.reduce((a, x) => a + Number(x.balance), 0);
 }
 export function totalCreditUsed(accounts: Account[]): number {
   return accounts.reduce((a, x) => a + Number(x.credit_used ?? 0), 0);
