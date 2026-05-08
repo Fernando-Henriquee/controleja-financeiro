@@ -30,6 +30,7 @@ type Ctx = {
   removeExpense: (id: string) => Promise<void>;
   updateAccountCreditLimit: (accountId: string, creditLimit: number | null) => Promise<void>;
   updateAccountCreditUsed: (accountId: string, creditUsed: number) => Promise<void>;
+  payCreditInvoice: (creditAccountId: string, fromDebitAccountId?: string) => Promise<{ amount: number; fromDebit: Account | undefined } | void>;
   addCreditAccount: (name: string, color: string, creditLimit: number) => Promise<void>;
   addDebitAccount: (name: string, color: string, balance: number) => Promise<void>;
   removeAccount: (id: string) => Promise<void>;
