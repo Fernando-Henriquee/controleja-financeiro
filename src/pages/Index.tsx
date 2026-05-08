@@ -14,7 +14,7 @@ import { ReminderWatcher } from "@/components/ReminderWatcher";
 import { MonthSelector } from "@/components/MonthSelector";
 import { MonthCalendar } from "@/components/MonthCalendar";
 import Profiles from "./Profiles";
-import { ChevronDown, LogOut, BarChart3 } from "lucide-react";
+import { ChevronDown, LogOut, BarChart3, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -39,6 +39,12 @@ const Index = () => {
             <h1 className="font-display text-2xl font-bold tracking-tight">Financeiro</h1>
           </div>
           <div className="flex items-center gap-2">
+            <Link
+              to="/planos"
+              className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-primary to-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow-sm hover:opacity-90 transition"
+            >
+              <Sparkles className="h-3.5 w-3.5" /> Planos
+            </Link>
             <Link
               to="/dashboard"
               className="flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-semibold shadow-sm hover:border-primary transition"

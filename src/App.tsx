@@ -9,7 +9,9 @@ import Index from "./pages/Index.tsx";
 import Auth from "./pages/Auth.tsx";
 import Cards from "./pages/Cards.tsx";
 import Dashboard from "./pages/Dashboard.tsx";
+import Plans from "./pages/Plans.tsx";
 import NotFound from "./pages/NotFound.tsx";
+import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
 
 const queryClient = new QueryClient();
 
@@ -21,11 +23,13 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <StoreProvider>
+            <PaymentTestModeBanner />
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/cards" element={<Cards />} />
               <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/planos" element={<Plans />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </StoreProvider>
