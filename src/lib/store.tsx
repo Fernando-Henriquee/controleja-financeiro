@@ -306,7 +306,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (data) setAccounts((prev) => [...prev, data as Account]);
   }, [activeProfile, accounts]);
 
-  const addDebitAccount = useCallback(async (name: string, color: string, balance: number) => {
+  const addDebitAccount = useCallback(async (name: string, color: string, balance: number, overdraftLimit?: number | null) => {
     if (!activeProfile) return;
     const nextPosition = accounts.length ? Math.max(...accounts.map((a) => Number(a.position))) + 1 : 0;
     const { data } = await supabase.from("accounts").insert({
@@ -318,9 +318,41 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       credit_used: 0,
       position: nextPosition,
       kind: "debit",
+      overdraft_limit: overdraftLimit && overdraftLimit > 0 ? overdraftLimit : null,
     } as any).select().single();
     if (data) setAccounts((prev) => [...prev, data as Account]);
   }, [activeProfile, accounts]);
+
+  const updateAccount = useCallback(async (id: string, patch: Partial<Pick<Account, "name" | "color" | "balance" | "credit_limit" | "credit_used" | "overdraft_limit">>) => {
+    await supabase.from("accounts").update(patch as any).eq("id", id);
+    setAccounts((prev) => prev.map((a) => a.id === id ? { ...a, ...patch } : a));
+  }, []);
+
+  const updateExpense = useCallback(async (id: string, patch: Partial<Pick<Expense, "amount" | "description" | "category" | "method" | "account_id" | "occurred_at">>) => {
+    const prev = expenses.find((e) => e.id === id);
+    if (!prev) return;
+    // Reverse old account effect
+    const oldAcc = accounts.find((a) => a.id === prev.account_id);
+    if (oldAcc) {
+      const reverse = prev.method === "credit"
+        ? { credit_used: Math.max(0, Number(oldAcc.credit_used) - Number(prev.amount)) }
+        : { balance: Number(oldAcc.balance) + Number(prev.amount) };
+      await supabase.from("accounts").update(reverse).eq("id", oldAcc.id);
+      setAccounts((p) => p.map((a) => a.id === oldAcc.id ? { ...a, ...reverse } : a));
+    }
+    const next: Expense = { ...prev, ...patch } as Expense;
+    await supabase.from("expenses").update(patch as any).eq("id", id);
+    setExpenses((p) => p.map((e) => e.id === id ? next : e));
+    // Apply new account effect
+    const newAcc = (await supabase.from("accounts").select("*").eq("id", next.account_id).maybeSingle()).data as Account | null;
+    if (newAcc) {
+      const apply = next.method === "credit"
+        ? { credit_used: Number(newAcc.credit_used) + Number(next.amount) }
+        : { balance: Number(newAcc.balance) - Number(next.amount) };
+      await supabase.from("accounts").update(apply).eq("id", newAcc.id);
+      setAccounts((p) => p.map((a) => a.id === newAcc.id ? { ...a, ...apply } : a));
+    }
+  }, [expenses, accounts]);
 
   const removeAccount = useCallback(async (id: string) => {
     await supabase.from("accounts").delete().eq("id", id);
