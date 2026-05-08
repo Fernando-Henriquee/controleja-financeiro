@@ -347,6 +347,7 @@ function CreditRow({ account }: { account: Account }) {
   const {
     updateAccountCreditLimit,
     updateAccountCreditUsed,
+    updateAccount,
     addExpenseManual,
     removeAccount,
     expenses,
@@ -359,6 +360,9 @@ function CreditRow({ account }: { account: Account }) {
   const plansForCard = installmentPlans.filter((p) => p.account_id === account.id);
   const [draftLimit, setDraftLimit] = useState(() => Number(account.credit_limit ?? 0));
   const [draftTotal, setDraftTotal] = useState(() => Number(account.credit_used));
+  const [editingMeta, setEditingMeta] = useState(false);
+  const [draftName, setDraftName] = useState(account.name);
+  const [draftColor, setDraftColor] = useState(account.color);
   const [exp, setExp] = useState({ amount: 0, description: "", category: "" });
   const [showExpense, setShowExpense] = useState(false);
   const [savingLimit, setSavingLimit] = useState(false);
