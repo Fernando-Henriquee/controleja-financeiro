@@ -15,10 +15,20 @@ serve(async (req) => {
 
     const systemPrompt = `Voce e um coach financeiro brasileiro pratico e empatico.
 Receba o snapshot financeiro (JSON) e use a ferramenta financial_advice para responder.
-- diagnosis: 1 frase em PT-BR explicando se esta no vermelho e quanto.
-- actions: 3 a 5 acoes objetivas em PT-BR (frases curtas).
-- savings_goal: meta de poupanca realista em R$ para o mes (numero).
-- category_goals: para cada categoria relevante (use as categorias presentes em gastos_por_categoria), defina um teto de gasto em R$ ate o fim do mes (limite o total a no maximo a sobra disponivel + a poupanca sugerida).
+
+- diagnosis: 1-2 frases em PT-BR explicando a situacao do mes (vermelho/amarelo/verde) e quanto.
+- actions: 3-5 acoes objetivas em PT-BR (frases curtas).
+- savings_goal: meta de poupanca realista em R$ para o mes (0 se nao houver folga).
+- category_goals: para cada categoria relevante (use as categorias presentes em gastos_por_categoria), defina um teto em R$ ate o fim do mes.
+- payment_plan: lista ordenada de "o que pagar primeiro" com base nas obrigacoes do snapshot.
+  * Inclua APENAS itens REAIS do snapshot:
+    - Cada item de \`faturas_por_cartao\` com usado > 0 -> kind="invoice", id = nome do cartao, amount = usado.
+    - Cada loan implicito em \`emprestimos_mes\` (se existir, agregue como kind="loan" amount=emprestimos_mes).
+    - Cada recorrente NAO paga em \`recorrentes\` -> kind="recurring", id = desc, amount = valor.
+    - Parcelas de cartao agregadas se \`parcelas_cartao_mes\` > 0 -> kind="installment".
+  * Priorize: contas essenciais (luz/agua/aluguel/internet) > emprestimos com juros altos > faturas para evitar rotativo > parcelas > recorrentes nao essenciais.
+  * Para cada item: { kind, label (texto curto que o humano reconhece), amount, priority (1=mais urgente), reason (1 frase), risk: "alta"|"media"|"baixa" }.
+  * Maximo 8 itens.
 Seja direto, sem moralizar.`;
 
     const tool = {
@@ -44,8 +54,24 @@ Seja direto, sem moralizar.`;
                 additionalProperties: false,
               },
             },
+            payment_plan: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  kind: { type: "string", enum: ["invoice", "loan", "recurring", "installment", "other"] },
+                  label: { type: "string" },
+                  amount: { type: "number" },
+                  priority: { type: "number" },
+                  reason: { type: "string" },
+                  risk: { type: "string", enum: ["alta", "media", "baixa"] },
+                },
+                required: ["kind", "label", "amount", "priority", "reason", "risk"],
+                additionalProperties: false,
+              },
+            },
           },
-          required: ["diagnosis", "actions", "savings_goal", "category_goals"],
+          required: ["diagnosis", "actions", "savings_goal", "category_goals", "payment_plan"],
           additionalProperties: false,
         },
       },
@@ -94,6 +120,7 @@ Seja direto, sem moralizar.`;
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+    if (!Array.isArray(advice.payment_plan)) advice.payment_plan = [];
 
     return new Response(JSON.stringify(advice), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
