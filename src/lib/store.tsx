@@ -417,6 +417,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       profile_id: activeProfile.id,
       month_key: mk,
       ...payload,
+      // paid_at is per-month: only persist on the currently selected month
+      paid_at: mk === selectedMonth ? (next.paid_at ?? null) : null,
       updated_at: new Date().toISOString(),
     }));
     await supabase.from("income_records").upsert(rows as any, { onConflict: "profile_id,month_key" });
