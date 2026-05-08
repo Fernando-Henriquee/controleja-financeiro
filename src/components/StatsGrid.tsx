@@ -44,12 +44,17 @@ export function StatsGrid() {
             <span className="uppercase tracking-wider">Saldo total</span>
           </div>
           <p className="mt-2 font-display text-xl font-bold tabular-nums">{fmtBRL(balance)}</p>
+          {depositedToday > 0 && (
+            <p className="mt-1 text-[11px] text-status-safe">
+              Inclui renda recebida: {fmtBRL(depositedToday)}
+            </p>
+          )}
           {debits.length > 0 ? (
             <ul className="mt-3 max-h-36 space-y-1.5 overflow-y-auto text-xs">
               {debits.map((a) => (
                 <li key={a.id} className="flex items-center justify-between gap-2 border-b border-border/60 pb-1.5 last:border-0 last:pb-0">
                   <span className="truncate font-medium">{a.name}</span>
-                  <span className="shrink-0 tabular-nums text-muted-foreground">{fmtBRL(Number(a.balance))}</span>
+                  <span className="shrink-0 tabular-nums text-muted-foreground">{fmtBRL(effectiveAccountBalance(a, income))}</span>
                 </li>
               ))}
             </ul>
