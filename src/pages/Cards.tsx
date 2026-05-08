@@ -97,6 +97,7 @@ function AddAccountForm() {
   const [name, setName] = useState("");
   const [limit, setLimit] = useState(0);
   const [balance, setBalance] = useState(0);
+  const [overdraft, setOverdraft] = useState(0);
   const [color, setColor] = useState("#3b82f6");
 
   function pickPreset(p: { name: string; color: string }) {
@@ -116,9 +117,14 @@ function AddAccountForm() {
       }
       await addCreditAccount(name.trim(), color, limit);
     } else {
-      await addDebitAccount(name.trim(), color, Math.max(0, Number.isFinite(balance) ? balance : 0));
+      await addDebitAccount(
+        name.trim(),
+        color,
+        Number.isFinite(balance) ? balance : 0,
+        overdraft > 0 ? overdraft : null,
+      );
     }
-    setName(""); setLimit(0); setBalance(0);
+    setName(""); setLimit(0); setBalance(0); setOverdraft(0);
     toast.success("Conta adicionada.");
   }
 
@@ -186,6 +192,18 @@ function AddAccountForm() {
           <Plus className="mr-1 h-3.5 w-3.5" /> Adicionar
         </button>
       </div>
+
+      {kind === "debit" && (
+        <label className="mt-2 block">
+          <span className="text-[11px] uppercase tracking-wider text-muted-foreground">Cheque especial (opcional)</span>
+          <MoneyInput
+            value={overdraft}
+            onChange={setOverdraft}
+            placeholder="Limite do cheque especial"
+            className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+          />
+        </label>
+      )}
     </div>
   );
 }
