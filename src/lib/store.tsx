@@ -54,7 +54,7 @@ type Ctx = {
 
 const StoreContext = createContext<Ctx | null>(null);
 
-const DEFAULT_INCOME: Income = { mode: "pj", monthly_salary: 0, hourly_rate: 0, working_days: 0, worked_hours: null, extra_income: 0, deposit_account_id: null };
+const DEFAULT_INCOME: Income = { mode: "pj", monthly_salary: 0, hourly_rate: 0, working_days: 0, worked_hours: null, extra_income: 0, deposit_account_id: null, paid_at: null };
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
