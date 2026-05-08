@@ -96,7 +96,7 @@ export function MonthCalendar() {
           <button
             key={idx}
             type="button"
-            onClick={() => cell.inMonth && setSelected(cell)}
+            onClick={() => cell.inMonth && (setSelected(cell), setEntryDay(cell))}
             disabled={!cell.inMonth}
             className={cn(
               "relative aspect-square rounded-lg border p-1 text-left text-[10px] transition",
