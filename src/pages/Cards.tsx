@@ -209,7 +209,42 @@ function AddAccountForm() {
 }
 
 function DebitRow({ account }: { account: Account }) {
-  const { removeAccount } = useStore();
+  const { removeAccount, updateAccount } = useStore();
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState({
+    name: account.name,
+    color: account.color,
+    balance: Number(account.balance),
+    overdraft_limit: Number(account.overdraft_limit ?? 0),
+  });
+
+  useEffect(() => {
+    setDraft({
+      name: account.name,
+      color: account.color,
+      balance: Number(account.balance),
+      overdraft_limit: Number(account.overdraft_limit ?? 0),
+    });
+  }, [account.id, account.name, account.color, account.balance, account.overdraft_limit]);
+
+  const overdraft = Number(account.overdraft_limit ?? 0);
+  const balance = Number(account.balance);
+  const usingOverdraft = overdraft > 0 && balance < 0;
+  const overdraftUsed = usingOverdraft ? Math.min(overdraft, Math.abs(balance)) : 0;
+  const overdraftPct = overdraft > 0 ? Math.min(100, (overdraftUsed / overdraft) * 100) : 0;
+
+  async function save() {
+    if (!draft.name.trim()) { toast.error("Nome obrigatório."); return; }
+    await updateAccount(account.id, {
+      name: draft.name.trim(),
+      color: draft.color,
+      balance: draft.balance,
+      overdraft_limit: draft.overdraft_limit > 0 ? draft.overdraft_limit : null,
+    });
+    setEditing(false);
+    toast.success("Conta atualizada.");
+  }
+
   return (
     <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
       <div className="flex items-center justify-between gap-3">
@@ -223,7 +258,13 @@ function DebitRow({ account }: { account: Account }) {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <p className="font-display text-base font-semibold tabular-nums">{fmtBRL(Number(account.balance))}</p>
+          <p className={`font-display text-base font-semibold tabular-nums ${balance < 0 ? "text-status-danger" : ""}`}>{fmtBRL(balance)}</p>
+          <button
+            onClick={() => setEditing((v) => !v)}
+            className="rounded-lg border border-border px-2 py-1 text-[11px] hover:border-primary"
+          >
+            {editing ? "Fechar" : "Editar"}
+          </button>
           <ConfirmButton
             onConfirm={() => removeAccount(account.id)}
             title={`Remover ${account.name}?`}
@@ -235,6 +276,69 @@ function DebitRow({ account }: { account: Account }) {
           </ConfirmButton>
         </div>
       </div>
+
+      {overdraft > 0 ? (
+        <div className="mt-3 border-t border-border pt-3">
+          <div className="flex items-center justify-between text-[11px]">
+            <span className="text-muted-foreground">Cheque especial</span>
+            <span className="tabular-nums">
+              {fmtBRL(overdraftUsed)} <span className="text-muted-foreground">/ {fmtBRL(overdraft)}</span>
+            </span>
+          </div>
+          <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-secondary">
+            <div
+              className="h-full rounded-full transition-all"
+              style={{
+                width: `${overdraftPct}%`,
+                background: overdraftPct > 85 ? "hsl(var(--status-danger))" : overdraftPct > 50 ? "hsl(var(--status-warn))" : "hsl(var(--status-safe))",
+              }}
+            />
+          </div>
+        </div>
+      ) : null}
+
+      {editing && (
+        <div className="mt-3 grid gap-2 border-t border-border pt-3 sm:grid-cols-2">
+          <label className="block">
+            <span className="text-[11px] uppercase tracking-wider text-muted-foreground">Nome do banco</span>
+            <input
+              value={draft.name}
+              onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+              className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+            />
+          </label>
+          <label className="block">
+            <span className="text-[11px] uppercase tracking-wider text-muted-foreground">Cor</span>
+            <input
+              type="color"
+              value={draft.color}
+              onChange={(e) => setDraft({ ...draft, color: e.target.value })}
+              className="mt-1 h-10 w-full rounded-xl border border-border bg-background p-1"
+            />
+          </label>
+          <label className="block">
+            <span className="text-[11px] uppercase tracking-wider text-muted-foreground">Saldo atual</span>
+            <MoneyInput
+              value={draft.balance}
+              onChange={(v) => setDraft({ ...draft, balance: v })}
+              className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+            />
+          </label>
+          <label className="block">
+            <span className="text-[11px] uppercase tracking-wider text-muted-foreground">Cheque especial</span>
+            <MoneyInput
+              value={draft.overdraft_limit}
+              onChange={(v) => setDraft({ ...draft, overdraft_limit: v })}
+              className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+            />
+          </label>
+          <div className="sm:col-span-2 flex justify-end">
+            <button onClick={save} className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground">
+              Salvar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
