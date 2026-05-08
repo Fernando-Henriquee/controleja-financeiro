@@ -1,0 +1,2 @@
+ALTER TABLE public.expenses ADD COLUMN IF NOT EXISTS is_pending boolean NOT NULL DEFAULT false;
+CREATE INDEX IF NOT EXISTS idx_expenses_pending ON public.expenses (profile_id, is_pending) WHERE is_pending = true;

@@ -150,6 +150,7 @@ export type Database = {
           created_at: string
           description: string
           id: string
+          is_pending: boolean
           method: string
           occurred_at: string
           profile_id: string
@@ -162,6 +163,7 @@ export type Database = {
           created_at?: string
           description: string
           id?: string
+          is_pending?: boolean
           method: string
           occurred_at?: string
           profile_id: string
@@ -174,6 +176,7 @@ export type Database = {
           created_at?: string
           description?: string
           id?: string
+          is_pending?: boolean
           method?: string
           occurred_at?: string
           profile_id?: string
