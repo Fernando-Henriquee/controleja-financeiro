@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
 import { buildMonthCalendar, fmtBRL, monthLabel, type DayCell } from "@/lib/finance";
 import { cn } from "@/lib/utils";
+import { ChevronDown, ChevronUp } from "lucide-react";
 
 const WEEKDAYS = ["D", "S", "T", "Q", "Q", "S", "S"];
 
