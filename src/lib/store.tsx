@@ -44,7 +44,7 @@ type Ctx = {
   addReminder: (reminder: Omit<Reminder, "id" | "profile_id">) => Promise<void>;
   removeReminder: (id: string) => Promise<void>;
   addLoan: (loan: Omit<Loan, "id" | "profile_id">) => Promise<void>;
-  updateLoan: (id: string, patch: Partial<Omit<Loan, "id" | "profile_id">>) => Promise<void>;
+  updateLoan: (id: string, patch: Partial<Omit<Loan, "id" | "profile_id">>, opts?: { paymentAccountId?: string }) => Promise<void>;
   removeLoan: (id: string) => Promise<void>;
   addInstallmentPlan: (input: Omit<InstallmentPlan, "id" | "profile_id">) => Promise<void>;
   updateInstallmentPlan: (id: string, patch: Partial<Omit<InstallmentPlan, "id" | "profile_id">>) => Promise<void>;
@@ -583,10 +583,38 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (data) setLoans((prev) => [data as Loan, ...prev]);
   }, [activeProfile]);
 
-  const updateLoan = useCallback(async (id: string, patch: Partial<Omit<Loan, "id" | "profile_id">>) => {
+  const updateLoan = useCallback(async (id: string, patch: Partial<Omit<Loan, "id" | "profile_id">>, opts?: { paymentAccountId?: string }) => {
+    const prev = loans.find((l) => l.id === id);
     const { data } = await supabase.from("loans").update(patch).eq("id", id).select().single();
-    if (data) setLoans((prev) => prev.map((l) => l.id === id ? (data as Loan) : l));
-  }, []);
+    if (data) {
+      setLoans((p) => p.map((l) => l.id === id ? (data as Loan) : l));
+      const next = data as Loan;
+      const delta = Number(next.paid_installments) - Number(prev?.paid_installments ?? 0);
+      if (activeProfile && delta > 0) {
+        const debit = accounts.find((a) => a.id === opts?.paymentAccountId && a.kind === "debit")
+          ?? accounts.find((a) => a.kind === "debit");
+        if (debit) {
+          for (let k = 0; k < delta; k += 1) {
+            const idx = Number(prev?.paid_installments ?? 0) + k + 1;
+            const amount = Number(next.installment_amount);
+            const { data: exp } = await supabase.from("expenses").insert({
+              profile_id: activeProfile.id,
+              account_id: debit.id,
+              amount,
+              description: `[Empréstimo ${idx}/${next.total_installments}] ${next.bank}`,
+              category: "Moradia",
+              method: "debit",
+              raw: `loan:${next.id}:${idx}`,
+            }).select().single();
+            if (exp) setExpenses((s) => [exp as Expense, ...s]);
+            const newBalance = Number(debit.balance) - amount;
+            await supabase.from("accounts").update({ balance: newBalance }).eq("id", debit.id);
+            setAccounts((s) => s.map((a) => a.id === debit.id ? { ...a, balance: newBalance } : a));
+          }
+        }
+      }
+    }
+  }, [loans, accounts, activeProfile]);
 
   const removeLoan = useCallback(async (id: string) => {
     await supabase.from("loans").delete().eq("id", id);
