@@ -200,6 +200,8 @@ export function MonthCalendar() {
           </p>
         </div>
       )}
+      </>
+      )}
     </div>
   );
 }
