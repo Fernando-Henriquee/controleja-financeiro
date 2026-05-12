@@ -74,8 +74,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const setActiveProfile = useCallback((p: Profile | null) => {
     setActiveProfileState(p);
-    if (p) localStorage.setItem(ACTIVE_KEY, p.id);
-    else localStorage.removeItem(ACTIVE_KEY);
+    if (p) {
+      localStorage.setItem(ACTIVE_KEY, p.id);
+      setSelectedMonth(currentCycleKey(p.cycle_start_day ?? 1));
+    } else {
+      localStorage.removeItem(ACTIVE_KEY);
+    }
   }, []);
 
   // Load profiles when user changes
