@@ -104,7 +104,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setRecurringRules([]); setReminders([]); setPatterns([]); setLoans([]); setInstallmentPlans([]);
       return;
     }
-    const range = monthDateRange(selectedMonth);
+    const range = monthDateRange(selectedMonth, activeProfile.cycle_start_day ?? 1);
     const [a, e, i, ir, rr, re, ep, ln, ip] = await Promise.all([
       supabase.from("accounts").select("*").eq("profile_id", activeProfile.id).order("position"),
       supabase
