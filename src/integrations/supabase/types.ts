@@ -64,6 +64,54 @@ export type Database = {
           },
         ]
       }
+      card_invoices: {
+        Row: {
+          account_id: string
+          created_at: string
+          cycle_key: string
+          due_date: string
+          id: string
+          paid_at: string | null
+          paid_from_account_id: string | null
+          period_end: string
+          period_start: string
+          profile_id: string
+          status: string
+          total: number
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          cycle_key: string
+          due_date: string
+          id?: string
+          paid_at?: string | null
+          paid_from_account_id?: string | null
+          period_end: string
+          period_start: string
+          profile_id: string
+          status?: string
+          total?: number
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          cycle_key?: string
+          due_date?: string
+          id?: string
+          paid_at?: string | null
+          paid_from_account_id?: string | null
+          period_end?: string
+          period_start?: string
+          profile_id?: string
+          status?: string
+          total?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       coach_conversations: {
         Row: {
           created_at: string
@@ -150,6 +198,7 @@ export type Database = {
           created_at: string
           description: string
           id: string
+          invoice_id: string | null
           is_pending: boolean
           method: string
           occurred_at: string
@@ -163,6 +212,7 @@ export type Database = {
           created_at?: string
           description: string
           id?: string
+          invoice_id?: string | null
           is_pending?: boolean
           method: string
           occurred_at?: string
@@ -176,6 +226,7 @@ export type Database = {
           created_at?: string
           description?: string
           id?: string
+          invoice_id?: string | null
           is_pending?: boolean
           method?: string
           occurred_at?: string
@@ -389,6 +440,7 @@ export type Database = {
         Row: {
           color: string
           created_at: string
+          cycle_start_day: number
           emoji: string
           id: string
           name: string
@@ -397,6 +449,7 @@ export type Database = {
         Insert: {
           color?: string
           created_at?: string
+          cycle_start_day?: number
           emoji?: string
           id?: string
           name: string
@@ -405,6 +458,7 @@ export type Database = {
         Update: {
           color?: string
           created_at?: string
+          cycle_start_day?: number
           emoji?: string
           id?: string
           name?: string

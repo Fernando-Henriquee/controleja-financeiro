@@ -1,14 +1,14 @@
 import { useStore } from "@/lib/store";
-import { monthKey, monthLabel } from "@/lib/finance";
+import { currentCycleKey, monthLabel, shiftCycleKey } from "@/lib/finance";
 
 export function MonthSelector() {
-  const { selectedMonth, setSelectedMonth } = useStore();
-  const current = monthKey();
+  const { selectedMonth, setSelectedMonth, activeProfile } = useStore();
+  const startDay = activeProfile?.cycle_start_day ?? 1;
+  const current = currentCycleKey(startDay);
+  const label = startDay > 1 ? "Ciclo" : "Mês de referência";
 
   function shift(delta: number) {
-    const [y, m] = selectedMonth.split("-").map(Number);
-    const next = new Date(y, m - 1 + delta, 1);
-    setSelectedMonth(monthKey(next));
+    setSelectedMonth(shiftCycleKey(selectedMonth, delta));
   }
 
   return (
@@ -17,8 +17,8 @@ export function MonthSelector() {
         {"<"}
       </button>
       <div className="text-center">
-        <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Mês de referência</p>
-        <p className="font-semibold capitalize">{monthLabel(selectedMonth)}</p>
+        <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">{label}</p>
+        <p className="font-semibold capitalize">{monthLabel(selectedMonth, startDay)}</p>
       </div>
       <div className="flex items-center gap-1">
         {selectedMonth !== current ? (

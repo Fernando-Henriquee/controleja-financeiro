@@ -1,82 +1,85 @@
-## Objetivo
+Vou aplicar em **fases** porque o conjunto é grande e cada fase precisa ser validada antes da próxima — senão quebra dados existentes. Começo pelas duas que mudam a base do app.
 
-Reorganizar a Receita para refletir que sua renda PJ varia mês a mês (horas reais), permitir escolher em qual conta o dinheiro entra e habilitar cheque especial nas contas de débito.
+## Fase 1 — Ciclo financeiro (base de tudo)
 
----
+**O que muda:**
+- Novo campo no perfil: `cycle_start_day` (1–28, default 1 = comportamento atual; você vai setar 11).
+- Toda a lógica de "mês" passa a usar **ciclo**: ex. ciclo "Mai/26" = 11/05 a 10/06.
+- `MonthSelector`, `MonthHeroCard`, `StatsGrid`, `Dashboard`, `MonthCalendar`, `RecentExpenses`, recorrentes, faturas — tudo agrupa por ciclo, não por mês de calendário.
+- Label do seletor mostra ambos: "Ciclo Mai (11/05 → 10/06)".
+- Lançamentos futuros (`is_pending`) continuam como hoje, mas alocados no ciclo correto.
 
-## 1. Renda PJ por mês (snapshot mensal)
+**Por que primeiro:** sem isso, "paguei fatura de abril em maio" continua confuso. Com isso, o registro do dia 10 já cai no ciclo certo automaticamente.
 
-Hoje a tabela `income_records` já guarda renda **por mês** (`month_key`), mas a UI sempre edita o mês selecionado e nunca propaga para o futuro. Vou mudar o comportamento:
+## Fase 2 — Faturas como entidade própria
 
-- **Editar o mês atual ou um mês passado** → salva apenas naquele mês (não sobrescreve outros).
-- **Editar e marcar "aplicar nos próximos meses"** (default ligado quando o mês editado é o atual) → grava o mesmo registro do mês selecionado até dezembro do ano corrente, **sem tocar em meses anteriores já registrados**.
-- Meses passados sem registro continuam usando o último snapshot conhecido (comportamento atual de fallback), mas a UI deixa explícito: "este mês ainda não tem registro próprio".
+**O que muda:**
+- Nova tabela `card_invoices`: uma fatura por cartão por ciclo, com `period_start`, `period_end`, `due_date`, `total`, `status` (`open` | `closed` | `paid`), `paid_from_account_id`.
+- Toda compra no crédito é vinculada à fatura aberta do cartão naquele ciclo.
+- Quando fecha o ciclo: fatura vira `closed` e é criada uma despesa programada (`is_pending`) na conta de débito de pagamento, com data = vencimento.
+- Card do banco em `BankInvoices` mostra: período, valor, vencimento, botão **"Marcar como paga"** (1 clique).
+- Compras futuras no crédito não somam mais no `credit_used` direto — somam na fatura.
 
-Resultado: você atualiza no início de cada mês as horas reais, e os meses futuros já entram com o novo valor automaticamente, sem alterar histórico.
+## Fase 3 — Visão "Próximo ciclo" + Saldo livre
 
----
+- Toggle no topo: **Atual | Próximo**.
+- No próximo ciclo: renda prevista + faturas que vão vencer + recorrentes + agendados + **saldo projetado no fim**.
+- `MonthHeroCard` mostra dois números: **Saldo total** e **Saldo livre** (= saldo − tudo que já tem dono no ciclo).
 
-## 2. Novo campo "Horas trabalhadas no mês"
+## Fase 4 — Registro rápido (FAB global + atalho)
 
-- Adicionar coluna `worked_hours` em `income_records` (default = `working_days * 8`).
-- Em `IncomeSheet` no modo PJ:
-  - Mostrar `valor hora`, `dias úteis (auto)` e `horas trabalhadas (editável)`.
-  - Cálculo PJ passa de `hourly_rate × 8 × working_days` para `hourly_rate × worked_hours`.
-  - Texto auxiliar: "Padrão: dias úteis × 8h. Edite para refletir suas horas reais do mês."
-- `expectedMonthlyIncome()` em `src/lib/finance.ts` passa a usar `worked_hours` quando presente.
-- Campo "Extras (PIX e avulsos)" continua igual.
+- Botão flutuante "+" presente em todas as páginas.
+- Atalho `N` abre modal com `FastInput` + form em campos.
+- Ação "Pagar fatura" de 1 clique nos cards de banco.
 
----
+## Fase 5 — Polimentos
 
-## 3. Conta destino da renda
-
-- Adicionar coluna `deposit_account_id uuid` em `income_records` (nullable).
-- No `IncomeSheet`, novo seletor "Cair em qual conta?" listando contas de débito do perfil.
-- Quando definido, o valor previsto da renda é exibido como crédito esperado naquela conta (apenas informativo no card da conta — sem mexer em saldo automaticamente, para não duplicar lançamentos).
-- Persistido por mês: você pode mudar de conta destino mês a mês.
-
----
-
-## 4. Cheque especial em contas de débito
-
-- Adicionar coluna `overdraft_limit numeric` (nullable, default null) em `accounts`.
-- Em `AccountsList` (form de débito), novo campo opcional "Cheque especial (R$)".
-- No card da conta de débito:
-  - Se houver `overdraft_limit > 0`, mostrar barra "Cheque especial usado" quando `balance < 0`, com `usado = min(|balance|, overdraft_limit)` e cor de severidade (warning > 50%, danger > 85%).
-  - Saldo disponível para limite diário passa a considerar `balance + overdraft_limit` para contas de débito que tenham cheque especial habilitado.
-- Atualizar `src/lib/finance.ts` (cálculo do limite diário e `monthPlan`) para somar `overdraft_limit` ao caixa disponível por conta de débito.
+- Linha do tempo do ciclo (barra horizontal: hoje, próxima renda, vencimentos).
+- Notificação "X lançamentos vão debitar hoje".
+- Recorrentes aparecem como linhas individuais programadas no ciclo.
 
 ---
 
-## Detalhes técnicos
+## Detalhes técnicos (fase 1 e 2)
 
-**Migração SQL (uma única):**
-
+**Migrações:**
 ```sql
-ALTER TABLE public.income_records ADD COLUMN worked_hours numeric;
-ALTER TABLE public.income_records ADD COLUMN deposit_account_id uuid;
-ALTER TABLE public.accounts ADD COLUMN overdraft_limit numeric;
+-- Fase 1
+ALTER TABLE profiles ADD COLUMN cycle_start_day INT NOT NULL DEFAULT 1
+  CHECK (cycle_start_day BETWEEN 1 AND 28);
+
+-- Fase 2
+CREATE TABLE card_invoices (
+  id UUID PK,
+  profile_id UUID,
+  account_id UUID,           -- cartão (kind=credit)
+  cycle_key TEXT,            -- ex "2026-05"
+  period_start DATE,
+  period_end DATE,
+  due_date DATE,
+  total NUMERIC DEFAULT 0,
+  status TEXT DEFAULT 'open',   -- open | closed | paid
+  paid_from_account_id UUID,    -- conta débito
+  paid_at TIMESTAMPTZ
+);
+ALTER TABLE expenses ADD COLUMN invoice_id UUID;
 ```
 
-**Tipos (`src/lib/types.ts`):**
+**Helper novo em `src/lib/finance.ts`:**
+- `cycleKeyForDate(date, startDay)`
+- `cycleRange(cycleKey, startDay)` → `{start, end}`
+- `cycleLabel(cycleKey, startDay)`
+- substitui usos de `monthKey` em telas, mantém `monthKey` só para compat de dados antigos.
 
-- `Income` ganha `worked_hours?: number` e `deposit_account_id?: string | null`.
-- `Account` ganha `overdraft_limit?: number | null`.
+**Compatibilidade:**
+- Perfis existentes ficam com `cycle_start_day=1` (comportamento idêntico ao atual).
+- Você muda pra 11 nas configs do perfil quando quiser.
+- Despesas antigas continuam funcionando — são re-agrupadas por ciclo na hora de exibir.
 
-**Store (`src/lib/store.tsx`):**
+---
 
-- `loadIncomeForMonth` lê `worked_hours` e `deposit_account_id`.
-- `updateIncome({...}, { applyToFuture: boolean })`: quando `applyToFuture=true` e `month_key >= currentMonth`, faz upsert em batch para todos os meses do mês selecionado até dezembro do ano.
-- `updateAccount` aceita `overdraft_limit`.
+## Proposta
 
-**UI:**
+Aplico **Fase 1 + Fase 2 agora** (a base). Depois você valida e seguimos pras 3, 4, 5.
 
-- `IncomeSheet.tsx`: toggle "Aplicar nos próximos meses" (default on quando edita mês atual ou futuro), campo `worked_hours`, seletor `deposit_account_id`.
-- `AccountsList.tsx`: campo `overdraft_limit` no formulário de conta débito; barra de cheque especial no card.
-- `DailyLimitCard.tsx` / `monthPlan.ts`: incluir `overdraft_limit` no caixa disponível.
-
-**Sem mudança visual fora dos pontos acima** — mantemos o redesign já feito do hero, calendário, etc.
-
-&nbsp;
-
-o cheque especial deve ser inserido no gerenciamento de cartoes, e em todos os lugares, gerenciamento de cartao, contas, emprestimos, gastos todos devem ter lugar onde editar, valor, banco, categoria tudo
+Confirma?

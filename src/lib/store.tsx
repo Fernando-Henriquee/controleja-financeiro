@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Account, AccountKind, Expense, ExpensePattern, Income, InstallmentPlan, Loan, PaymentMethod, Profile, RecurringRule, Reminder } from "./types";
-import { businessDaysInMonth, businessDaysInMonthKey, expectedMonthlyIncome, monthDateRange, monthKey, parseExpenseWithHistory } from "./finance";
+import { businessDaysInMonth, businessDaysInMonthKey, currentCycleKey, expectedMonthlyIncome, monthDateRange, monthKey, parseExpenseWithHistory } from "./finance";
 import { useAuth } from "./auth";
 
 const ACTIVE_KEY = "copilot.activeProfileId";
@@ -15,6 +15,7 @@ type Ctx = {
   setSelectedMonth: (month: string) => void;
   createProfile: (name: string, emoji: string, color: string) => Promise<Profile | null>;
   deleteProfile: (id: string) => Promise<void>;
+  updateProfile: (id: string, patch: Partial<Pick<Profile, "name" | "emoji" | "color" | "cycle_start_day">>) => Promise<void>;
 
   accounts: Account[];
   expenses: Expense[];
@@ -73,8 +74,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const setActiveProfile = useCallback((p: Profile | null) => {
     setActiveProfileState(p);
-    if (p) localStorage.setItem(ACTIVE_KEY, p.id);
-    else localStorage.removeItem(ACTIVE_KEY);
+    if (p) {
+      localStorage.setItem(ACTIVE_KEY, p.id);
+      setSelectedMonth(currentCycleKey(p.cycle_start_day ?? 1));
+    } else {
+      localStorage.removeItem(ACTIVE_KEY);
+    }
   }, []);
 
   // Load profiles when user changes
@@ -94,6 +99,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const savedId = localStorage.getItem(ACTIVE_KEY);
       const found = list.find(p => p.id === savedId) ?? null;
       setActiveProfileState(found);
+      if (found) setSelectedMonth(currentCycleKey(found.cycle_start_day ?? 1));
       setLoading(false);
     })();
   }, [user]);
@@ -104,7 +110,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setRecurringRules([]); setReminders([]); setPatterns([]); setLoans([]); setInstallmentPlans([]);
       return;
     }
-    const range = monthDateRange(selectedMonth);
+    const range = monthDateRange(selectedMonth, activeProfile.cycle_start_day ?? 1);
     const [a, e, i, ir, rr, re, ep, ln, ip] = await Promise.all([
       supabase.from("accounts").select("*").eq("profile_id", activeProfile.id).order("position"),
       supabase
@@ -187,6 +193,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setProfiles(prev => prev.filter(p => p.id !== id));
     if (activeProfile?.id === id) setActiveProfile(null);
   }, [activeProfile, setActiveProfile]);
+
+  const updateProfile = useCallback(async (id: string, patch: Partial<Pick<Profile, "name" | "emoji" | "color" | "cycle_start_day">>) => {
+    await supabase.from("profiles").update(patch as any).eq("id", id);
+    setProfiles(prev => prev.map(p => p.id === id ? { ...p, ...patch } : p));
+    setActiveProfileState(prev => prev && prev.id === id ? { ...prev, ...patch } : prev);
+    // If cycle changed, snap selected month to current cycle
+    if (patch.cycle_start_day !== undefined) {
+      setSelectedMonth(currentCycleKey(patch.cycle_start_day));
+    }
+  }, []);
 
   const addExpenseFromText = useCallback(async (text: string) => {
     if (!activeProfile) return { expense: null, error: "Selecione um perfil para lançar gastos." };
@@ -762,7 +778,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<Ctx>(() => ({
     loading, profiles, activeProfile, selectedMonth, setActiveProfile, setSelectedMonth,
-    createProfile, deleteProfile,
+    createProfile, deleteProfile, updateProfile,
     accounts, expenses, income: effectiveIncome, recurringRules, reminders, patterns, loans, installmentPlans,
     addExpenseFromText, addExpenseManual, removeExpense, updateExpense, updateAccount,
     updateAccountCreditLimit, updateAccountCreditUsed, payCreditInvoice, addCreditAccount, addDebitAccount, removeAccount,
@@ -771,7 +787,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     addLoan, updateLoan, removeLoan,
     addInstallmentPlan, updateInstallmentPlan, removeInstallmentPlan,
     refresh,
-  }), [loading, profiles, activeProfile, selectedMonth, setActiveProfile, createProfile, deleteProfile, accounts, expenses, effectiveIncome, recurringRules, reminders, patterns, loans, installmentPlans, addExpenseFromText, addExpenseManual, removeExpense, updateExpense, updateAccount, updateAccountCreditLimit, updateAccountCreditUsed, payCreditInvoice, addCreditAccount, addDebitAccount, removeAccount, updateIncome, addRecurringRule, removeRecurringRule, markRecurringPaid, unmarkRecurringPaid, addReminder, removeReminder, addLoan, updateLoan, removeLoan, addInstallmentPlan, updateInstallmentPlan, removeInstallmentPlan, refresh]);
+  }), [loading, profiles, activeProfile, selectedMonth, setActiveProfile, createProfile, deleteProfile, updateProfile, accounts, expenses, effectiveIncome, recurringRules, reminders, patterns, loans, installmentPlans, addExpenseFromText, addExpenseManual, removeExpense, updateExpense, updateAccount, updateAccountCreditLimit, updateAccountCreditUsed, payCreditInvoice, addCreditAccount, addDebitAccount, removeAccount, updateIncome, addRecurringRule, removeRecurringRule, markRecurringPaid, unmarkRecurringPaid, addReminder, removeReminder, addLoan, updateLoan, removeLoan, addInstallmentPlan, updateInstallmentPlan, removeInstallmentPlan, refresh]);
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }
