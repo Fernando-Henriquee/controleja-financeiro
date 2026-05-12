@@ -189,6 +189,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (activeProfile?.id === id) setActiveProfile(null);
   }, [activeProfile, setActiveProfile]);
 
+  const updateProfile = useCallback(async (id: string, patch: Partial<Pick<Profile, "name" | "emoji" | "color" | "cycle_start_day">>) => {
+    await supabase.from("profiles").update(patch as any).eq("id", id);
+    setProfiles(prev => prev.map(p => p.id === id ? { ...p, ...patch } : p));
+    setActiveProfileState(prev => prev && prev.id === id ? { ...prev, ...patch } : prev);
+    // If cycle changed, snap selected month to current cycle
+    if (patch.cycle_start_day !== undefined) {
+      setSelectedMonth(currentCycleKey(patch.cycle_start_day));
+    }
+  }, []);
+
   const addExpenseFromText = useCallback(async (text: string) => {
     if (!activeProfile) return { expense: null, error: "Selecione um perfil para lançar gastos." };
     const parsed = parseExpenseWithHistory(text, accounts, expenses);
