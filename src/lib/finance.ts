@@ -336,16 +336,64 @@ export function parseMonthKey(key: string): { year: number; month: number } {
   return { year: y, month: m };
 }
 
-export function monthDateRange(key: string): { startIso: string; endIso: string } {
+export function monthDateRange(key: string, cycleStartDay = 1): { startIso: string; endIso: string } {
+  if (cycleStartDay > 1) return cycleDateRange(key, cycleStartDay);
   const { year, month } = parseMonthKey(key);
   const start = new Date(year, month - 1, 1, 0, 0, 0, 0);
   const end = new Date(year, month, 1, 0, 0, 0, 0);
   return { startIso: start.toISOString(), endIso: end.toISOString() };
 }
 
-export function monthLabel(key: string): string {
+export function monthLabel(key: string, cycleStartDay = 1): string {
   const { year, month } = parseMonthKey(key);
-  return new Date(year, month - 1, 1).toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  const base = new Date(year, month - 1, 1).toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  if (cycleStartDay <= 1) return base;
+  const { start, end } = cycleRange(key, cycleStartDay);
+  const fmt = (d: Date) => `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
+  return `${base} (${fmt(start)} → ${fmt(end)})`;
+}
+
+// ---- Cycle helpers ----
+/** Cycle key for a date given the user's cycle start day. */
+export function cycleKeyForDate(date: Date, cycleStartDay = 1): string {
+  if (cycleStartDay <= 1) return monthKey(date);
+  const d = new Date(date);
+  if (d.getDate() < cycleStartDay) {
+    d.setMonth(d.getMonth() - 1);
+  }
+  return monthKey(d);
+}
+
+/** Range covered by a cycle key. End is exclusive (next cycle's start). */
+export function cycleRange(key: string, cycleStartDay = 1): { start: Date; end: Date } {
+  const { year, month } = parseMonthKey(key);
+  if (cycleStartDay <= 1) {
+    return { start: new Date(year, month - 1, 1), end: new Date(year, month, 0) };
+  }
+  const start = new Date(year, month - 1, cycleStartDay, 0, 0, 0, 0);
+  const endExclusive = new Date(year, month, cycleStartDay, 0, 0, 0, 0);
+  const end = new Date(endExclusive.getTime() - 1);
+  return { start, end };
+}
+
+export function cycleDateRange(key: string, cycleStartDay = 1): { startIso: string; endIso: string } {
+  if (cycleStartDay <= 1) return monthDateRange(key, 1);
+  const { year, month } = parseMonthKey(key);
+  const start = new Date(year, month - 1, cycleStartDay, 0, 0, 0, 0);
+  const end = new Date(year, month, cycleStartDay, 0, 0, 0, 0);
+  return { startIso: start.toISOString(), endIso: end.toISOString() };
+}
+
+/** Shift a cycle key by N cycles. */
+export function shiftCycleKey(key: string, delta: number): string {
+  const { year, month } = parseMonthKey(key);
+  const d = new Date(year, month - 1 + delta, 1);
+  return monthKey(d);
+}
+
+/** Current cycle key for the user's start day. */
+export function currentCycleKey(cycleStartDay = 1): string {
+  return cycleKeyForDate(new Date(), cycleStartDay);
 }
 
 // ---- Calendar helpers ----
