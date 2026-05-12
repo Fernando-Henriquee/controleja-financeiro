@@ -5,6 +5,7 @@ export type Profile = {
   name: string;
   emoji: string;
   color: string;
+  cycle_start_day?: number;
 };
 
 export type AccountKind = "debit" | "credit";
