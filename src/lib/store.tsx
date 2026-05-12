@@ -99,6 +99,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const savedId = localStorage.getItem(ACTIVE_KEY);
       const found = list.find(p => p.id === savedId) ?? null;
       setActiveProfileState(found);
+      if (found) setSelectedMonth(currentCycleKey(found.cycle_start_day ?? 1));
       setLoading(false);
     })();
   }, [user]);
