@@ -590,7 +590,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
     setExpenses((prev) => [data as Expense, ...prev]);
     return { expense: data as Expense };
-  }, [activeProfile, accounts]);
+  }, [activeProfile, accounts, cardInvoices]);
 
   // Auto-apply pending (future-scheduled) expenses whose date has arrived
   useEffect(() => {
