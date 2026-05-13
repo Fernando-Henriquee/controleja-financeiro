@@ -74,6 +74,7 @@ export type Expense = {
   occurred_at: string;
   raw?: string | null;
   is_pending?: boolean;
+  invoice_id?: string | null;
 };
 
 export type Income = {
