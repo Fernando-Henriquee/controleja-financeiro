@@ -25,15 +25,17 @@ type Ctx = {
   patterns: ExpensePattern[];
   loans: Loan[];
   installmentPlans: InstallmentPlan[];
+  cardInvoices: CardInvoice[];
 
   addExpenseFromText: (text: string) => Promise<{ expense: Expense | null; error?: string }>;
   addExpenseManual: (input: { amount: number; description: string; category?: string; method: PaymentMethod; account_id: string; occurred_at?: string }) => Promise<{ expense: Expense | null; error?: string }>;
   removeExpense: (id: string) => Promise<void>;
   updateExpense: (id: string, patch: Partial<Pick<Expense, "amount" | "description" | "category" | "method" | "account_id" | "occurred_at">>) => Promise<void>;
-  updateAccount: (id: string, patch: Partial<Pick<Account, "name" | "color" | "balance" | "credit_limit" | "credit_used" | "overdraft_limit">>) => Promise<void>;
+  updateAccount: (id: string, patch: Partial<Pick<Account, "name" | "color" | "balance" | "credit_limit" | "credit_used" | "overdraft_limit" | "closing_day" | "due_day">>) => Promise<void>;
   updateAccountCreditLimit: (accountId: string, creditLimit: number | null) => Promise<void>;
   updateAccountCreditUsed: (accountId: string, creditUsed: number) => Promise<void>;
   payCreditInvoice: (creditAccountId: string, fromDebitAccountId?: string) => Promise<{ amount: number; fromDebit: Account | undefined } | void>;
+  payInvoice: (invoiceId: string, fromDebitAccountId?: string) => Promise<{ amount: number; fromDebit: Account | undefined } | void>;
   addCreditAccount: (name: string, color: string, creditLimit: number) => Promise<void>;
   addDebitAccount: (name: string, color: string, balance: number, overdraftLimit?: number | null) => Promise<void>;
   removeAccount: (id: string) => Promise<void>;
