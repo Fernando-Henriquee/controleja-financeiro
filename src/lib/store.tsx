@@ -529,6 +529,35 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       today.setHours(23, 59, 59, 999);
       if (d.getTime() > today.getTime()) isPending = true;
     }
+    // If credit, ensure invoice for the cycle that contains the expense date
+    let invoiceId: string | null = null;
+    if (input.method === "credit") {
+      const card = accounts.find((a) => a.id === input.account_id);
+      const cycleStart = activeProfile.cycle_start_day ?? 1;
+      const expenseDate = input.occurred_at ? new Date(input.occurred_at) : new Date();
+      const cycleKey = cycleKeyForDate(expenseDate, cycleStart);
+      const existing = cardInvoices.find((inv) => inv.account_id === input.account_id && inv.cycle_key === cycleKey);
+      if (existing) {
+        invoiceId = existing.id;
+      } else if (card) {
+        const win = invoiceWindowFor(cycleKey, cycleStart, card);
+        const { data: invRow } = await supabase.from("card_invoices").upsert({
+          profile_id: activeProfile.id,
+          account_id: input.account_id,
+          cycle_key: cycleKey,
+          period_start: win.period_start,
+          period_end: win.period_end,
+          due_date: win.due_date,
+          total: 0,
+          status: "open",
+        } as any, { onConflict: "account_id,cycle_key" }).select().single();
+        if (invRow) {
+          invoiceId = (invRow as CardInvoice).id;
+          setCardInvoices((prev) => prev.some((i) => i.id === invoiceId) ? prev : [...prev, invRow as CardInvoice]);
+        }
+      }
+    }
+
     const insertPayload: any = {
       profile_id: activeProfile.id,
       account_id: input.account_id,
@@ -538,6 +567,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       method: input.method,
       raw: null,
       is_pending: isPending,
+      invoice_id: invoiceId,
     };
     if (input.occurred_at) insertPayload.occurred_at = input.occurred_at;
     const { data, error } = await supabase.from("expenses").insert(insertPayload).select().single();
@@ -551,6 +581,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         await supabase.from("accounts").update(patch).eq("id", acc.id);
         setAccounts((prev) => prev.map((a) => a.id === acc.id ? { ...a, ...patch } : a));
       }
+    }
+    if (invoiceId) {
+      const inv = cardInvoices.find((i) => i.id === invoiceId);
+      const next = Math.max(0, Number(inv?.total ?? 0) + input.amount);
+      await supabase.from("card_invoices").update({ total: next, updated_at: new Date().toISOString() }).eq("id", invoiceId);
+      setCardInvoices((prev) => prev.map((i) => i.id === invoiceId ? { ...i, total: next } : i));
     }
     setExpenses((prev) => [data as Expense, ...prev]);
     return { expense: data as Expense };
