@@ -316,8 +316,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setAccounts(prev => prev.map(a => a.id === acc.id ? { ...a, ...patch } : a));
       }
     }
+    if (exp.invoice_id) {
+      const inv = cardInvoices.find((i) => i.id === exp.invoice_id);
+      if (inv && inv.status !== "paid") {
+        const next = Math.max(0, Number(inv.total) - Number(exp.amount));
+        await supabase.from("card_invoices").update({ total: next, updated_at: new Date().toISOString() }).eq("id", inv.id);
+        setCardInvoices((prev) => prev.map((i) => i.id === inv.id ? { ...i, total: next } : i));
+      }
+    }
     setExpenses(prev => prev.filter(e => e.id !== id));
-  }, [expenses, accounts]);
+  }, [expenses, accounts, cardInvoices]);
 
   const updateAccountCreditLimit = useCallback(async (accountId: string, creditLimit: number | null) => {
     await supabase.from("accounts").update({ credit_limit: creditLimit }).eq("id", accountId);
