@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import type { Account, AccountKind, Expense, ExpensePattern, Income, InstallmentPlan, Loan, PaymentMethod, Profile, RecurringRule, Reminder } from "./types";
-import { businessDaysInMonth, businessDaysInMonthKey, currentCycleKey, expectedMonthlyIncome, monthDateRange, monthKey, parseExpenseWithHistory } from "./finance";
+import type { Account, AccountKind, CardInvoice, Expense, ExpensePattern, Income, InstallmentPlan, Loan, PaymentMethod, Profile, RecurringRule, Reminder } from "./types";
+import { businessDaysInMonth, businessDaysInMonthKey, currentCycleKey, expectedMonthlyIncome, monthDateRange, monthKey, parseExpenseWithHistory, cycleKeyForDate, invoiceWindowFor } from "./finance";
 import { useAuth } from "./auth";
 
 const ACTIVE_KEY = "copilot.activeProfileId";
