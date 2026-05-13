@@ -214,6 +214,34 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const parsed = parseExpenseWithHistory(text, accounts, expenses);
     if (!parsed) return { expense: null, error: "Não consegui entender este gasto. Ex: 30 almoço débito itaú" };
 
+    // If credit, ensure invoice for current cycle
+    let invoiceId: string | null = null;
+    if (parsed.method === "credit") {
+      const card = accounts.find((a) => a.id === parsed.account_id);
+      const cycleStart = activeProfile.cycle_start_day ?? 1;
+      const cycleKey = cycleKeyForDate(new Date(), cycleStart);
+      const existing = cardInvoices.find((inv) => inv.account_id === parsed.account_id && inv.cycle_key === cycleKey);
+      if (existing) {
+        invoiceId = existing.id;
+      } else if (card) {
+        const win = invoiceWindowFor(cycleKey, cycleStart, card);
+        const { data: invRow } = await supabase.from("card_invoices").upsert({
+          profile_id: activeProfile.id,
+          account_id: parsed.account_id,
+          cycle_key: cycleKey,
+          period_start: win.period_start,
+          period_end: win.period_end,
+          due_date: win.due_date,
+          total: 0,
+          status: "open",
+        } as any, { onConflict: "account_id,cycle_key" }).select().single();
+        if (invRow) {
+          invoiceId = (invRow as CardInvoice).id;
+          setCardInvoices((prev) => prev.some((i) => i.id === invoiceId) ? prev : [...prev, invRow as CardInvoice]);
+        }
+      }
+    }
+
     const { data, error } = await supabase.from("expenses").insert({
       profile_id: activeProfile.id,
       account_id: parsed.account_id,
@@ -222,12 +250,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       category: parsed.category,
       method: parsed.method,
       raw: parsed.raw,
-    }).select().single();
+      invoice_id: invoiceId,
+    } as any).select().single();
     if (error || !data) {
       return {
         expense: null,
         error: error?.message ?? "Falha ao salvar gasto. Verifique permissões e tente novamente.",
       };
+    }
+
+    if (invoiceId) {
+      const inv = cardInvoices.find((i) => i.id === invoiceId);
+      const next = Math.max(0, Number(inv?.total ?? 0) + parsed.amount);
+      await supabase.from("card_invoices").update({ total: next, updated_at: new Date().toISOString() }).eq("id", invoiceId);
+      setCardInvoices((prev) => prev.map((i) => i.id === invoiceId ? { ...i, total: next } : i));
     }
 
     // Update account balance/credit
