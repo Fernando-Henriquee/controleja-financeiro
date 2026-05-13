@@ -20,6 +20,24 @@ export type Account = {
   position: number;
   kind: AccountKind;
   overdraft_limit?: number | null;
+  closing_day?: number | null;
+  due_day?: number | null;
+};
+
+export type InvoiceStatus = "open" | "closed" | "paid";
+
+export type CardInvoice = {
+  id: string;
+  profile_id: string;
+  account_id: string;
+  cycle_key: string;
+  period_start: string;
+  period_end: string;
+  due_date: string;
+  total: number;
+  status: InvoiceStatus;
+  paid_from_account_id: string | null;
+  paid_at: string | null;
 };
 
 export type Loan = {
@@ -56,6 +74,7 @@ export type Expense = {
   occurred_at: string;
   raw?: string | null;
   is_pending?: boolean;
+  invoice_id?: string | null;
 };
 
 export type Income = {

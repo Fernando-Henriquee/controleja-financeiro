@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import type { Account, AccountKind, Expense, ExpensePattern, Income, InstallmentPlan, Loan, PaymentMethod, Profile, RecurringRule, Reminder } from "./types";
-import { businessDaysInMonth, businessDaysInMonthKey, currentCycleKey, expectedMonthlyIncome, monthDateRange, monthKey, parseExpenseWithHistory } from "./finance";
+import type { Account, AccountKind, CardInvoice, Expense, ExpensePattern, Income, InstallmentPlan, Loan, PaymentMethod, Profile, RecurringRule, Reminder } from "./types";
+import { businessDaysInMonth, businessDaysInMonthKey, currentCycleKey, expectedMonthlyIncome, monthDateRange, monthKey, parseExpenseWithHistory, cycleKeyForDate, invoiceWindowFor } from "./finance";
 import { useAuth } from "./auth";
 
 const ACTIVE_KEY = "copilot.activeProfileId";
@@ -25,15 +25,17 @@ type Ctx = {
   patterns: ExpensePattern[];
   loans: Loan[];
   installmentPlans: InstallmentPlan[];
+  cardInvoices: CardInvoice[];
 
   addExpenseFromText: (text: string) => Promise<{ expense: Expense | null; error?: string }>;
   addExpenseManual: (input: { amount: number; description: string; category?: string; method: PaymentMethod; account_id: string; occurred_at?: string }) => Promise<{ expense: Expense | null; error?: string }>;
   removeExpense: (id: string) => Promise<void>;
   updateExpense: (id: string, patch: Partial<Pick<Expense, "amount" | "description" | "category" | "method" | "account_id" | "occurred_at">>) => Promise<void>;
-  updateAccount: (id: string, patch: Partial<Pick<Account, "name" | "color" | "balance" | "credit_limit" | "credit_used" | "overdraft_limit">>) => Promise<void>;
+  updateAccount: (id: string, patch: Partial<Pick<Account, "name" | "color" | "balance" | "credit_limit" | "credit_used" | "overdraft_limit" | "closing_day" | "due_day">>) => Promise<void>;
   updateAccountCreditLimit: (accountId: string, creditLimit: number | null) => Promise<void>;
   updateAccountCreditUsed: (accountId: string, creditUsed: number) => Promise<void>;
   payCreditInvoice: (creditAccountId: string, fromDebitAccountId?: string) => Promise<{ amount: number; fromDebit: Account | undefined } | void>;
+  payInvoice: (invoiceId: string, fromDebitAccountId?: string) => Promise<{ amount: number; fromDebit: Account | undefined } | void>;
   addCreditAccount: (name: string, color: string, creditLimit: number) => Promise<void>;
   addDebitAccount: (name: string, color: string, balance: number, overdraftLimit?: number | null) => Promise<void>;
   removeAccount: (id: string) => Promise<void>;
@@ -70,6 +72,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [patterns, setPatterns] = useState<ExpensePattern[]>([]);
   const [loans, setLoans] = useState<Loan[]>([]);
   const [installmentPlans, setInstallmentPlans] = useState<InstallmentPlan[]>([]);
+  const [cardInvoices, setCardInvoices] = useState<CardInvoice[]>([]);
   const [loading, setLoading] = useState(true);
 
   const setActiveProfile = useCallback((p: Profile | null) => {
@@ -111,7 +114,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       return;
     }
     const range = monthDateRange(selectedMonth, activeProfile.cycle_start_day ?? 1);
-    const [a, e, i, ir, rr, re, ep, ln, ip] = await Promise.all([
+    const [a, e, i, ir, rr, re, ep, ln, ip, ci] = await Promise.all([
       supabase.from("accounts").select("*").eq("profile_id", activeProfile.id).order("position"),
       supabase
         .from("expenses")
@@ -128,9 +131,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       supabase.from("expense_patterns").select("*").eq("profile_id", activeProfile.id).order("use_count", { ascending: false }).limit(200),
       supabase.from("loans").select("*").eq("profile_id", activeProfile.id).order("created_at", { ascending: false }),
       supabase.from("installment_plans").select("*").eq("profile_id", activeProfile.id).order("created_at", { ascending: false }),
+      supabase.from("card_invoices").select("*").eq("profile_id", activeProfile.id).eq("cycle_key", selectedMonth),
     ]);
     setAccounts((a.data ?? []) as Account[]);
     setExpenses((e.data ?? []) as Expense[]);
+    setCardInvoices((ci.data ?? []) as CardInvoice[]);
     setRecurringRules((rr.data ?? []) as RecurringRule[]);
     setReminders((re.data ?? []) as Reminder[]);
     setPatterns((ep.data ?? []) as ExpensePattern[]);
@@ -209,6 +214,34 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const parsed = parseExpenseWithHistory(text, accounts, expenses);
     if (!parsed) return { expense: null, error: "Não consegui entender este gasto. Ex: 30 almoço débito itaú" };
 
+    // If credit, ensure invoice for current cycle
+    let invoiceId: string | null = null;
+    if (parsed.method === "credit") {
+      const card = accounts.find((a) => a.id === parsed.account_id);
+      const cycleStart = activeProfile.cycle_start_day ?? 1;
+      const cycleKey = cycleKeyForDate(new Date(), cycleStart);
+      const existing = cardInvoices.find((inv) => inv.account_id === parsed.account_id && inv.cycle_key === cycleKey);
+      if (existing) {
+        invoiceId = existing.id;
+      } else if (card) {
+        const win = invoiceWindowFor(cycleKey, cycleStart, card);
+        const { data: invRow } = await supabase.from("card_invoices").upsert({
+          profile_id: activeProfile.id,
+          account_id: parsed.account_id,
+          cycle_key: cycleKey,
+          period_start: win.period_start,
+          period_end: win.period_end,
+          due_date: win.due_date,
+          total: 0,
+          status: "open",
+        } as any, { onConflict: "account_id,cycle_key" }).select().single();
+        if (invRow) {
+          invoiceId = (invRow as CardInvoice).id;
+          setCardInvoices((prev) => prev.some((i) => i.id === invoiceId) ? prev : [...prev, invRow as CardInvoice]);
+        }
+      }
+    }
+
     const { data, error } = await supabase.from("expenses").insert({
       profile_id: activeProfile.id,
       account_id: parsed.account_id,
@@ -217,12 +250,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       category: parsed.category,
       method: parsed.method,
       raw: parsed.raw,
-    }).select().single();
+      invoice_id: invoiceId,
+    } as any).select().single();
     if (error || !data) {
       return {
         expense: null,
         error: error?.message ?? "Falha ao salvar gasto. Verifique permissões e tente novamente.",
       };
+    }
+
+    if (invoiceId) {
+      const inv = cardInvoices.find((i) => i.id === invoiceId);
+      const next = Math.max(0, Number(inv?.total ?? 0) + parsed.amount);
+      await supabase.from("card_invoices").update({ total: next, updated_at: new Date().toISOString() }).eq("id", invoiceId);
+      setCardInvoices((prev) => prev.map((i) => i.id === invoiceId ? { ...i, total: next } : i));
     }
 
     // Update account balance/credit
@@ -259,7 +300,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }
     }
     return { expense: exp };
-  }, [activeProfile, accounts, expenses, patterns]);
+  }, [activeProfile, accounts, expenses, patterns, cardInvoices]);
 
   const removeExpense = useCallback(async (id: string) => {
     const exp = expenses.find(e => e.id === id);
@@ -275,8 +316,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setAccounts(prev => prev.map(a => a.id === acc.id ? { ...a, ...patch } : a));
       }
     }
+    if (exp.invoice_id) {
+      const inv = cardInvoices.find((i) => i.id === exp.invoice_id);
+      if (inv && inv.status !== "paid") {
+        const next = Math.max(0, Number(inv.total) - Number(exp.amount));
+        await supabase.from("card_invoices").update({ total: next, updated_at: new Date().toISOString() }).eq("id", inv.id);
+        setCardInvoices((prev) => prev.map((i) => i.id === inv.id ? { ...i, total: next } : i));
+      }
+    }
     setExpenses(prev => prev.filter(e => e.id !== id));
-  }, [expenses, accounts]);
+  }, [expenses, accounts, cardInvoices]);
 
   const updateAccountCreditLimit = useCallback(async (accountId: string, creditLimit: number | null) => {
     await supabase.from("accounts").update({ credit_limit: creditLimit }).eq("id", accountId);
@@ -321,6 +370,84 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return { amount, fromDebit };
   }, [accounts, activeProfile]);
 
+  const ensureOpenInvoice = useCallback(async (accountId: string, cycleKey: string): Promise<CardInvoice | null> => {
+    if (!activeProfile) return null;
+    const card = accounts.find((a) => a.id === accountId);
+    if (!card || card.kind !== "credit") return null;
+    const existing = cardInvoices.find((inv) => inv.account_id === accountId && inv.cycle_key === cycleKey);
+    if (existing) return existing;
+    const { data: found } = await supabase
+      .from("card_invoices")
+      .select("*")
+      .eq("account_id", accountId)
+      .eq("cycle_key", cycleKey)
+      .maybeSingle();
+    if (found) {
+      const row = found as CardInvoice;
+      setCardInvoices((prev) => prev.some((i) => i.id === row.id) ? prev : [...prev, row]);
+      return row;
+    }
+    const win = invoiceWindowFor(cycleKey, activeProfile.cycle_start_day ?? 1, card);
+    const { data, error } = await supabase.from("card_invoices").insert({
+      profile_id: activeProfile.id,
+      account_id: accountId,
+      cycle_key: cycleKey,
+      period_start: win.period_start,
+      period_end: win.period_end,
+      due_date: win.due_date,
+      total: 0,
+      status: "open",
+    }).select().single();
+    if (error || !data) return null;
+    const row = data as CardInvoice;
+    setCardInvoices((prev) => [...prev, row]);
+    return row;
+  }, [accounts, activeProfile, cardInvoices]);
+
+  const bumpInvoiceTotal = useCallback(async (invoiceId: string, delta: number) => {
+    const inv = cardInvoices.find((i) => i.id === invoiceId);
+    const next = Math.max(0, Number(inv?.total ?? 0) + delta);
+    await supabase.from("card_invoices").update({ total: next, updated_at: new Date().toISOString() }).eq("id", invoiceId);
+    setCardInvoices((prev) => prev.map((i) => i.id === invoiceId ? { ...i, total: next } : i));
+  }, [cardInvoices]);
+
+  const payInvoice = useCallback(async (invoiceId: string, fromDebitAccountId?: string) => {
+    if (!activeProfile) return;
+    const inv = cardInvoices.find((i) => i.id === invoiceId);
+    if (!inv) return;
+    const card = accounts.find((a) => a.id === inv.account_id);
+    if (!card) return;
+    const amount = Number(inv.total ?? 0);
+    const fromDebit =
+      accounts.find((a) => a.id === fromDebitAccountId && a.kind === "debit") ??
+      accounts.find((a) => a.kind === "debit" && a.name.toLowerCase() === card.name.toLowerCase()) ??
+      accounts.find((a) => a.kind === "debit");
+    const newUsed = Math.max(0, Number(card.credit_used ?? 0) - amount);
+    await supabase.from("accounts").update({ credit_used: newUsed }).eq("id", card.id);
+    setAccounts((prev) => prev.map((a) => a.id === card.id ? { ...a, credit_used: newUsed } : a));
+    await supabase.from("card_invoices").update({
+      status: "paid",
+      paid_at: new Date().toISOString(),
+      paid_from_account_id: fromDebit?.id ?? null,
+    }).eq("id", inv.id);
+    setCardInvoices((prev) => prev.map((i) => i.id === inv.id ? { ...i, status: "paid", paid_at: new Date().toISOString(), paid_from_account_id: fromDebit?.id ?? null } : i));
+    if (fromDebit && amount > 0) {
+      const newBalance = Number(fromDebit.balance) - amount;
+      await supabase.from("accounts").update({ balance: newBalance }).eq("id", fromDebit.id);
+      setAccounts((prev) => prev.map((a) => a.id === fromDebit.id ? { ...a, balance: newBalance } : a));
+      const { data: exp } = await supabase.from("expenses").insert({
+        profile_id: activeProfile.id,
+        account_id: fromDebit.id,
+        amount,
+        description: `[Fatura ${card.name}]`,
+        category: "Moradia",
+        method: "debit",
+        raw: `fatura:${card.id}:${inv.cycle_key}`,
+      }).select().single();
+      if (exp) setExpenses((prev) => [exp as Expense, ...prev]);
+    }
+    return { amount, fromDebit };
+  }, [activeProfile, accounts, cardInvoices]);
 
   const addCreditAccount = useCallback(async (name: string, color: string, creditLimit: number) => {
     if (!activeProfile) return;
@@ -402,6 +529,35 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       today.setHours(23, 59, 59, 999);
       if (d.getTime() > today.getTime()) isPending = true;
     }
+    // If credit, ensure invoice for the cycle that contains the expense date
+    let invoiceId: string | null = null;
+    if (input.method === "credit") {
+      const card = accounts.find((a) => a.id === input.account_id);
+      const cycleStart = activeProfile.cycle_start_day ?? 1;
+      const expenseDate = input.occurred_at ? new Date(input.occurred_at) : new Date();
+      const cycleKey = cycleKeyForDate(expenseDate, cycleStart);
+      const existing = cardInvoices.find((inv) => inv.account_id === input.account_id && inv.cycle_key === cycleKey);
+      if (existing) {
+        invoiceId = existing.id;
+      } else if (card) {
+        const win = invoiceWindowFor(cycleKey, cycleStart, card);
+        const { data: invRow } = await supabase.from("card_invoices").upsert({
+          profile_id: activeProfile.id,
+          account_id: input.account_id,
+          cycle_key: cycleKey,
+          period_start: win.period_start,
+          period_end: win.period_end,
+          due_date: win.due_date,
+          total: 0,
+          status: "open",
+        } as any, { onConflict: "account_id,cycle_key" }).select().single();
+        if (invRow) {
+          invoiceId = (invRow as CardInvoice).id;
+          setCardInvoices((prev) => prev.some((i) => i.id === invoiceId) ? prev : [...prev, invRow as CardInvoice]);
+        }
+      }
+    }
+
     const insertPayload: any = {
       profile_id: activeProfile.id,
       account_id: input.account_id,
@@ -411,6 +567,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       method: input.method,
       raw: null,
       is_pending: isPending,
+      invoice_id: invoiceId,
     };
     if (input.occurred_at) insertPayload.occurred_at = input.occurred_at;
     const { data, error } = await supabase.from("expenses").insert(insertPayload).select().single();
@@ -425,9 +582,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setAccounts((prev) => prev.map((a) => a.id === acc.id ? { ...a, ...patch } : a));
       }
     }
+    if (invoiceId) {
+      const inv = cardInvoices.find((i) => i.id === invoiceId);
+      const next = Math.max(0, Number(inv?.total ?? 0) + input.amount);
+      await supabase.from("card_invoices").update({ total: next, updated_at: new Date().toISOString() }).eq("id", invoiceId);
+      setCardInvoices((prev) => prev.map((i) => i.id === invoiceId ? { ...i, total: next } : i));
+    }
     setExpenses((prev) => [data as Expense, ...prev]);
     return { expense: data as Expense };
-  }, [activeProfile, accounts]);
+  }, [activeProfile, accounts, cardInvoices]);
 
   // Auto-apply pending (future-scheduled) expenses whose date has arrived
   useEffect(() => {
@@ -779,15 +942,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const value = useMemo<Ctx>(() => ({
     loading, profiles, activeProfile, selectedMonth, setActiveProfile, setSelectedMonth,
     createProfile, deleteProfile, updateProfile,
-    accounts, expenses, income: effectiveIncome, recurringRules, reminders, patterns, loans, installmentPlans,
+    accounts, expenses, income: effectiveIncome, recurringRules, reminders, patterns, loans, installmentPlans, cardInvoices,
     addExpenseFromText, addExpenseManual, removeExpense, updateExpense, updateAccount,
-    updateAccountCreditLimit, updateAccountCreditUsed, payCreditInvoice, addCreditAccount, addDebitAccount, removeAccount,
+    updateAccountCreditLimit, updateAccountCreditUsed, payCreditInvoice, payInvoice, addCreditAccount, addDebitAccount, removeAccount,
     updateIncome,
     addRecurringRule, removeRecurringRule, markRecurringPaid, unmarkRecurringPaid, addReminder, removeReminder,
     addLoan, updateLoan, removeLoan,
     addInstallmentPlan, updateInstallmentPlan, removeInstallmentPlan,
     refresh,
-  }), [loading, profiles, activeProfile, selectedMonth, setActiveProfile, createProfile, deleteProfile, updateProfile, accounts, expenses, effectiveIncome, recurringRules, reminders, patterns, loans, installmentPlans, addExpenseFromText, addExpenseManual, removeExpense, updateExpense, updateAccount, updateAccountCreditLimit, updateAccountCreditUsed, payCreditInvoice, addCreditAccount, addDebitAccount, removeAccount, updateIncome, addRecurringRule, removeRecurringRule, markRecurringPaid, unmarkRecurringPaid, addReminder, removeReminder, addLoan, updateLoan, removeLoan, addInstallmentPlan, updateInstallmentPlan, removeInstallmentPlan, refresh]);
+  }), [loading, profiles, activeProfile, selectedMonth, setActiveProfile, createProfile, deleteProfile, updateProfile, accounts, expenses, effectiveIncome, recurringRules, reminders, patterns, loans, installmentPlans, cardInvoices, addExpenseFromText, addExpenseManual, removeExpense, updateExpense, updateAccount, updateAccountCreditLimit, updateAccountCreditUsed, payCreditInvoice, payInvoice, addCreditAccount, addDebitAccount, removeAccount, updateIncome, addRecurringRule, removeRecurringRule, markRecurringPaid, unmarkRecurringPaid, addReminder, removeReminder, addLoan, updateLoan, removeLoan, addInstallmentPlan, updateInstallmentPlan, removeInstallmentPlan, refresh]);
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }

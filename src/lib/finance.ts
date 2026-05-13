@@ -396,6 +396,38 @@ export function currentCycleKey(cycleStartDay = 1): string {
   return cycleKeyForDate(new Date(), cycleStartDay);
 }
 
+/** Short cycle label, e.g. "Mai/26". */
+export function cycleLabel(key: string): string {
+  const { year, month } = parseMonthKey(key);
+  const m = new Date(year, month - 1, 1).toLocaleDateString("pt-BR", { month: "short" }).replace(".", "");
+  return `${m}/${String(year).slice(-2)}`;
+}
+
+/** Compute period_start, period_end (inclusive) and due_date for a cycle.
+ *  Uses card's own closing_day/due_day when available, otherwise falls back
+ *  to the profile's cycleStartDay (period closes the day before the next cycle starts,
+ *  due_date defaults to next cycle's start day). */
+export function invoiceWindowFor(
+  cycleKey: string,
+  cycleStartDay: number,
+  card?: { closing_day?: number | null; due_day?: number | null } | null,
+): { period_start: string; period_end: string; due_date: string } {
+  const { year, month } = parseMonthKey(cycleKey);
+  const closing = card?.closing_day ?? Math.max(1, cycleStartDay);
+  const dueDay = card?.due_day ?? Math.max(1, cycleStartDay);
+  // Period: from `closing` of previous month to (closing - 1) of current month
+  const start = new Date(year, month - 2, closing);
+  const end = new Date(year, month - 1, closing - 1);
+  // Due date is `dueDay` of current month (or shift to next month if before period_end)
+  let due = new Date(year, month - 1, dueDay);
+  if (due.getTime() < end.getTime()) {
+    due = new Date(year, month, dueDay);
+  }
+  const fmt = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return { period_start: fmt(start), period_end: fmt(end), due_date: fmt(due) };
+}
+
 // ---- Calendar helpers ----
 export type DayCell = {
   date: Date;

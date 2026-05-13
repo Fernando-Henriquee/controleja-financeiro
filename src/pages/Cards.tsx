@@ -472,22 +472,58 @@ function CreditRow({ account }: { account: Account }) {
       </div>
 
       {editingMeta && (
-        <div className="mt-3 grid gap-2 border-t border-border pt-3 sm:grid-cols-[1fr_auto_auto]">
-          <input
-            value={draftName}
-            onChange={(e) => setDraftName(e.target.value)}
-            placeholder="Nome do banco"
-            className="rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
-          />
-          <input
-            type="color"
-            value={draftColor}
-            onChange={(e) => setDraftColor(e.target.value)}
-            className="h-10 w-12 rounded-xl border border-border bg-background p-1"
-          />
-          <button onClick={saveMeta} className="rounded-xl bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground">
-            Salvar
-          </button>
+        <div className="mt-3 space-y-2 border-t border-border pt-3">
+          <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto]">
+            <input
+              value={draftName}
+              onChange={(e) => setDraftName(e.target.value)}
+              placeholder="Nome do banco"
+              className="rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+            />
+            <input
+              type="color"
+              value={draftColor}
+              onChange={(e) => setDraftColor(e.target.value)}
+              className="h-10 w-12 rounded-xl border border-border bg-background p-1"
+            />
+            <button onClick={saveMeta} className="rounded-xl bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground">
+              Salvar
+            </button>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <label className="text-[11px] uppercase tracking-wider text-muted-foreground">
+              Dia do fechamento
+              <input
+                type="number"
+                min={1}
+                max={28}
+                defaultValue={account.closing_day ?? ""}
+                placeholder="usa ciclo do perfil"
+                onBlur={async (e) => {
+                  const v = e.target.value ? Number(e.target.value) : null;
+                  await updateAccount(account.id, { closing_day: v });
+                  toast.success("Dia de fechamento salvo.");
+                }}
+                className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary normal-case"
+              />
+            </label>
+            <label className="text-[11px] uppercase tracking-wider text-muted-foreground">
+              Dia do vencimento
+              <input
+                type="number"
+                min={1}
+                max={28}
+                defaultValue={account.due_day ?? ""}
+                placeholder="usa ciclo do perfil"
+                onBlur={async (e) => {
+                  const v = e.target.value ? Number(e.target.value) : null;
+                  await updateAccount(account.id, { due_day: v });
+                  toast.success("Dia de vencimento salvo.");
+                }}
+                className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary normal-case"
+              />
+            </label>
+          </div>
         </div>
       )}
 
