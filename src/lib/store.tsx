@@ -114,7 +114,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       return;
     }
     const range = monthDateRange(selectedMonth, activeProfile.cycle_start_day ?? 1);
-    const [a, e, i, ir, rr, re, ep, ln, ip] = await Promise.all([
+    const [a, e, i, ir, rr, re, ep, ln, ip, ci] = await Promise.all([
       supabase.from("accounts").select("*").eq("profile_id", activeProfile.id).order("position"),
       supabase
         .from("expenses")
@@ -131,9 +131,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       supabase.from("expense_patterns").select("*").eq("profile_id", activeProfile.id).order("use_count", { ascending: false }).limit(200),
       supabase.from("loans").select("*").eq("profile_id", activeProfile.id).order("created_at", { ascending: false }),
       supabase.from("installment_plans").select("*").eq("profile_id", activeProfile.id).order("created_at", { ascending: false }),
+      supabase.from("card_invoices").select("*").eq("profile_id", activeProfile.id).eq("cycle_key", selectedMonth),
     ]);
     setAccounts((a.data ?? []) as Account[]);
     setExpenses((e.data ?? []) as Expense[]);
+    setCardInvoices((ci.data ?? []) as CardInvoice[]);
     setRecurringRules((rr.data ?? []) as RecurringRule[]);
     setReminders((re.data ?? []) as Reminder[]);
     setPatterns((ep.data ?? []) as ExpensePattern[]);
