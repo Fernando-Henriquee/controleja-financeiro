@@ -326,8 +326,85 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return { amount, fromDebit };
   }, [accounts, activeProfile]);
 
+  const ensureOpenInvoice = useCallback(async (accountId: string, cycleKey: string): Promise<CardInvoice | null> => {
+    if (!activeProfile) return null;
+    const card = accounts.find((a) => a.id === accountId);
+    if (!card || card.kind !== "credit") return null;
+    const existing = cardInvoices.find((inv) => inv.account_id === accountId && inv.cycle_key === cycleKey);
+    if (existing) return existing;
+    const { data: found } = await supabase
+      .from("card_invoices")
+      .select("*")
+      .eq("account_id", accountId)
+      .eq("cycle_key", cycleKey)
+      .maybeSingle();
+    if (found) {
+      const row = found as CardInvoice;
+      setCardInvoices((prev) => prev.some((i) => i.id === row.id) ? prev : [...prev, row]);
+      return row;
+    }
+    const win = invoiceWindowFor(cycleKey, activeProfile.cycle_start_day ?? 1, card);
+    const { data, error } = await supabase.from("card_invoices").insert({
+      profile_id: activeProfile.id,
+      account_id: accountId,
+      cycle_key: cycleKey,
+      period_start: win.period_start,
+      period_end: win.period_end,
+      due_date: win.due_date,
+      total: 0,
+      status: "open",
+    }).select().single();
+    if (error || !data) return null;
+    const row = data as CardInvoice;
+    setCardInvoices((prev) => [...prev, row]);
+    return row;
+  }, [accounts, activeProfile, cardInvoices]);
 
-  const addCreditAccount = useCallback(async (name: string, color: string, creditLimit: number) => {
+  const bumpInvoiceTotal = useCallback(async (invoiceId: string, delta: number) => {
+    const inv = cardInvoices.find((i) => i.id === invoiceId);
+    const next = Math.max(0, Number(inv?.total ?? 0) + delta);
+    await supabase.from("card_invoices").update({ total: next, updated_at: new Date().toISOString() }).eq("id", invoiceId);
+    setCardInvoices((prev) => prev.map((i) => i.id === invoiceId ? { ...i, total: next } : i));
+  }, [cardInvoices]);
+
+  const payInvoice = useCallback(async (invoiceId: string, fromDebitAccountId?: string) => {
+    if (!activeProfile) return;
+    const inv = cardInvoices.find((i) => i.id === invoiceId);
+    if (!inv) return;
+    const card = accounts.find((a) => a.id === inv.account_id);
+    if (!card) return;
+    const amount = Number(inv.total ?? 0);
+    const fromDebit =
+      accounts.find((a) => a.id === fromDebitAccountId && a.kind === "debit") ??
+      accounts.find((a) => a.kind === "debit" && a.name.toLowerCase() === card.name.toLowerCase()) ??
+      accounts.find((a) => a.kind === "debit");
+    const newUsed = Math.max(0, Number(card.credit_used ?? 0) - amount);
+    await supabase.from("accounts").update({ credit_used: newUsed }).eq("id", card.id);
+    setAccounts((prev) => prev.map((a) => a.id === card.id ? { ...a, credit_used: newUsed } : a));
+    await supabase.from("card_invoices").update({
+      status: "paid",
+      paid_at: new Date().toISOString(),
+      paid_from_account_id: fromDebit?.id ?? null,
+    }).eq("id", inv.id);
+    setCardInvoices((prev) => prev.map((i) => i.id === inv.id ? { ...i, status: "paid", paid_at: new Date().toISOString(), paid_from_account_id: fromDebit?.id ?? null } : i));
+    if (fromDebit && amount > 0) {
+      const newBalance = Number(fromDebit.balance) - amount;
+      await supabase.from("accounts").update({ balance: newBalance }).eq("id", fromDebit.id);
+      setAccounts((prev) => prev.map((a) => a.id === fromDebit.id ? { ...a, balance: newBalance } : a));
+      const { data: exp } = await supabase.from("expenses").insert({
+        profile_id: activeProfile.id,
+        account_id: fromDebit.id,
+        amount,
+        description: `[Fatura ${card.name}]`,
+        category: "Moradia",
+        method: "debit",
+        raw: `fatura:${card.id}:${inv.cycle_key}`,
+      }).select().single();
+      if (exp) setExpenses((prev) => [exp as Expense, ...prev]);
+    }
+    return { amount, fromDebit };
+  }, [activeProfile, accounts, cardInvoices]);
+
     if (!activeProfile) return;
     const nextPosition = accounts.length ? Math.max(...accounts.map((a) => Number(a.position))) + 1 : 0;
     const { data } = await supabase.from("accounts").insert({
