@@ -405,6 +405,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return { amount, fromDebit };
   }, [activeProfile, accounts, cardInvoices]);
 
+  const addCreditAccount = useCallback(async (name: string, color: string, creditLimit: number) => {
     if (!activeProfile) return;
     const nextPosition = accounts.length ? Math.max(...accounts.map((a) => Number(a.position))) + 1 : 0;
     const { data } = await supabase.from("accounts").insert({
