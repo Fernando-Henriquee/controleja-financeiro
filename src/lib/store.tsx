@@ -300,7 +300,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }
     }
     return { expense: exp };
-  }, [activeProfile, accounts, expenses, patterns]);
+  }, [activeProfile, accounts, expenses, patterns, cardInvoices]);
 
   const removeExpense = useCallback(async (id: string) => {
     const exp = expenses.find(e => e.id === id);
