@@ -72,6 +72,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [patterns, setPatterns] = useState<ExpensePattern[]>([]);
   const [loans, setLoans] = useState<Loan[]>([]);
   const [installmentPlans, setInstallmentPlans] = useState<InstallmentPlan[]>([]);
+  const [cardInvoices, setCardInvoices] = useState<CardInvoice[]>([]);
   const [loading, setLoading] = useState(true);
 
   const setActiveProfile = useCallback((p: Profile | null) => {
