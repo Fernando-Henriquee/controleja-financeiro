@@ -73,10 +73,12 @@ export function useSubscription() {
 // Feature gates per plan
 type Feature = "unlimited_accounts" | "unlimited_cards" | "ai_coach" | "ai_insights";
 
+// Todos os recursos liberados para todos os usuários.
+const ALL_FEATURES: Feature[] = ["unlimited_accounts", "unlimited_cards", "ai_coach", "ai_insights"];
 const LIMITS: Record<Plan, { accounts: number; cards: number; features: Feature[] }> = {
-  free:   { accounts: 2, cards: 2, features: [] },
-  pro:    { accounts: Infinity, cards: Infinity, features: ["unlimited_accounts", "unlimited_cards"] },
-  pro_ai: { accounts: Infinity, cards: Infinity, features: ["unlimited_accounts", "unlimited_cards", "ai_coach", "ai_insights"] },
+  free:   { accounts: Infinity, cards: Infinity, features: ALL_FEATURES },
+  pro:    { accounts: Infinity, cards: Infinity, features: ALL_FEATURES },
+  pro_ai: { accounts: Infinity, cards: Infinity, features: ALL_FEATURES },
 };
 
 export function getPlanLimits(plan: Plan) {
